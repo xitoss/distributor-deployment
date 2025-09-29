@@ -1,25 +1,27 @@
-version: "3.8"
-services:
-  db:
-    image: postgres:15
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${DB_NAME}
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-    volumes:
-      - ./database:/var/lib/postgresql/data
+  version: "3.8"
+  services:
+    db:
+      image: postgres:15
+      restart: unless-stopped
+      environment:
+        POSTGRES_DB: ${DB_NAME}
+        POSTGRES_USER: ${DB_USER}
+        POSTGRES_PASSWORD: ${DB_PASSWORD}
+      volumes:
+        - ./database:/var/lib/postgresql/data
 
-  web:
-    image: yourhubuser/distributor:1.0.0
-    restart: unless-stopped
-    env_file:
-      - .env
-    depends_on:
-      - db
-    volumes:
-      - ./media:/app/media
-      - ./secret.txt:/app/secret.txt
-      - ./license.pem:/app/license.pem
-    ports:
-      - "8000:8000"
+    web:
+      build: ../distributor   # builds from Dockerfile inside ./distributor
+      image: distributor-app:local 
+      restart: unless-stopped
+      env_file:
+        - .env
+      depends_on:
+        - db
+      volumes:
+        - ../distributor:/app 
+        - ./media:/app/media
+        - ./license.pem:/app/license.pem
+        - ./staticfiles:/app/staticfiles 
+      ports:
+        - "8000:8000"
