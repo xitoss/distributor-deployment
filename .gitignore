@@ -1,3 +1,6 @@
 venv-deploy
 license.pem
 .env
+database
+media
+staticfiles
