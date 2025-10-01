@@ -99,7 +99,6 @@ def write_env(payload, values):
         "DJANGO_DEBUG": "False",
 
         # --- License & domain info ---
-        "LICENSE_FILE": "/app/license.pem",
         "LETSENCRYPT_EMAIL": payload.get("contact_email", "ops@example.com"),
         "DOMAIN": domain,
     }
