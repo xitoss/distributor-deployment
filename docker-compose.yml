@@ -1,28 +1,96 @@
-  # version: "3.8"
-  services:
-    db:
-      image: postgres:15
-      restart: unless-stopped
-      environment:
-        POSTGRES_DB: ${DB_NAME}
-        POSTGRES_USER: ${DB_USER}
-        POSTGRES_PASSWORD: ${DB_PASSWORD}
-      volumes:
-        - ./database:/var/lib/postgresql/data
+services:
+  db:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ./database:/var/lib/postgresql/data
 
-    web:
-      build: ../distributor   # builds from Dockerfile inside ../distributor
-      image: distributor-app:local 
-      restart: unless-stopped
-      env_file:
-        - .env
-      depends_on:
-        - db
-      volumes:
-        - ../distributor:/app 
-        - ./media:/app/media
-        - ./license.pem:/app/license/license.pem
-        - ./license_public.pem:/app/license/license_public.pem
-        # - ./staticfiles:/app/staticfiles 
-      ports:
-        - "8000:8000"
+  web:
+    image: distributor-app:latest   # from your GitHub package
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - db
+    volumes:
+      - ./media:/app/media
+      - ./license.pem:/app/license/license.pem
+      - ./license_public.pem:/app/license/license_public.pem
+
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    env_file: .env
+    volumes:
+      - ./ssl:/etc/letsencrypt
+      - ./media:/app/media
+      - ./static:/app/staticfiles
+      - ./nginx/certbot:/var/www/certbot
+    depends_on:
+      - web
+
+  certbot:
+    image: certbot/certbot
+    restart: unless-stopped
+    volumes:
+      - ./ssl:/etc/letsencrypt
+      - ./nginx/certbot:/var/www/certbot
+    entrypoint: >
+      sh -c "if [ ! -f /etc/letsencrypt/live/${DOMAIN}/fullchain.pem ]; then
+              certbot certonly --webroot -w /var/www/certbot \
+                -d ${DOMAIN} \
+                --email ${LETSENCRYPT_EMAIL} \
+                --agree-tos --non-interactive;
+            fi;
+            trap exit TERM; while :; do
+              certbot renew --webroot -w /var/www/certbot --quiet;
+              sleep 12h & wait $${!};
+            done" 
+
+
+
+
+#### NOTE ###
+# FOR testing create 'docker-compose.override.yml' and paste the following conents
+# services:
+#   web:
+#     build: ../distributor
+#     image: distributor-app:local
+#     restart: unless-stopped
+#     env_file:
+#       - .env
+#     depends_on:
+#       - db
+#     volumes:
+#       - ../distributor:/app
+#       - ./media:/app/media
+#       - ./license.pem:/app/license/license.pem
+#       - ./license_public.pem:/app/license/license_public.pem
+#     ports:
+#       - "8000:8000" 
+#     command: python manage.py runserver 0.0.0.0:8000
+
+#   nginx:
+#     build:
+#       context: ./nginx
+#       dockerfile: Dockerfile.dev
+#     ports:
+#       - "8080:80"
+#     env_file: .env
+#     volumes:
+#       - ./media:/app/media
+#       - ./static:/app/staticfiles
+  
+#   certbot:
+#     image: certbot/certbot
+#     # this will overriede chertbot from actual one and do nothing
+#     entrypoint: ["true"]

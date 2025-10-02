@@ -1,0 +1,22 @@
+# Shell / Python / scripts
+*.sh     text eol=lf
+*.py     text eol=lf
+
+# Docker / Compose
+Dockerfile text eol=lf
+Dockerfile.* text eol=lf
+*.dockerignore text eol=lf
+*.yml    text eol=lf
+*.yaml   text eol=lf
+
+# Config files
+*.conf   text eol=lf
+*.ini    text eol=lf
+*.cfg    text eol=lf
+*.json   text eol=lf
+*.template text eol=lf
+*.env.template text eol=lf
+
+# Documentation
+*.md     text eol=lf
+*.txt    text eol=lf

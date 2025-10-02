@@ -4,4 +4,8 @@ license.pem
 database/
 media/
 staticfiles/
+static/
 backup/
+ssl/
+certbot/
+docker-compose.override.yml
