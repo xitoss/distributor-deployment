@@ -10,7 +10,8 @@ services:
       - ./database:/var/lib/postgresql/data
 
   web:
-    image: distributor-app:latest   # from your GitHub package
+    image: ghcr.io/xitoss/distributor-app:latest  # from your GitHub package
+    pull_policy: always
     restart: unless-stopped
     env_file:
       - .env
