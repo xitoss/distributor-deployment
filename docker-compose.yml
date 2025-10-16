@@ -21,6 +21,7 @@ services:
       - ./media:/app/media
       - ./license.pem:/app/license/license.pem
       - ./license_public.pem:/app/license/license_public.pem
+      - ./sys_scripts:/app/sys_scripts # /app/sys_scripts must align with sys_scripts/commands.json 
 
   nginx:
     build:
