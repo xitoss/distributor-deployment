@@ -22,6 +22,7 @@ services:
       - ./license.pem:/app/license/license.pem
       - ./license_public.pem:/app/license/license_public.pem
       - ./sys_scripts:/app/sys_scripts # /app/sys_scripts must align with sys_scripts/command_map.py 
+      - ./backup:/app/backup 
 
   nginx:
     build:
