@@ -9,3 +9,5 @@ backup/
 ssl/
 certbot/
 docker-compose.override.yml
+__pycache__/
+*.pyc
