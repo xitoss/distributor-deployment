@@ -4,10 +4,10 @@ Simplified Preflight Script
 - verifies license
 - prompts user only for essential DB + superuser credentials + domain
 - generates secret key automatically
+- generates agent key, set agent port for system operations
 - writes full .env file with all required variables
 """
 
-import os
 import json
 import base64
 from pathlib import Path
@@ -78,12 +78,12 @@ def generate_secret():
 def write_env(payload, values):
     # auto-expand allowed hosts
     domain = values["DOMAIN"]
-    allowed_hosts = f"{domain},www.{domain}"
+    allowed_hosts = f"{domain},www.{domain},127.0.0.1,localhost"
 
     env_vars = {
         "DJANGO_SETTINGS_MODULE": "distributor.settings",
+
         # --- DB ---
-        "DB_ENGINE": "django.db.backends.postgresql",
         "DB_NAME": "distributor_db",
         "DB_USER": values["DB_USER"],
         "DB_PASSWORD": values["DB_PASSWORD"],
@@ -98,6 +98,14 @@ def write_env(payload, values):
         "ALLOWED_HOSTS": allowed_hosts,
         "DJANGO_DEBUG": "False",
 
+        # --- to run agent scripts ----
+        "AGENT_HOST": "0.0.0.0",
+        "AGENT_KEY": generate_secret(),
+        "AGENT_PORT": "6001",
+        "POSTGRES_DB": "distributor_db",
+        "POSTGRES_USER": values["DB_USER"],
+        "POSTGRES_PASSWORD": values["DB_PASSWORD"],
+
         # --- License & domain info ---
         "LETSENCRYPT_EMAIL": payload.get("contact_email", "ops@example.com"),
         "DOMAIN": domain,
@@ -107,7 +115,7 @@ def write_env(payload, values):
         "\n".join(f"{k}={v}" for k, v in env_vars.items()) + "\n",
         encoding="utf-8"
     )
-    print(f"\n✅ .env file created at {ENV_FILE}")
+    print(f"\n .env file created at {ENV_FILE}")
 
 
 def main():
@@ -124,10 +132,16 @@ def main():
     try:
         public_key = load_public_key(pub_key_file)
         payload = verify_license(license_file, public_key)
-        print("✅ License verified for:", payload.get("company", "Unknown company"))
+        print("License verified for:", payload.get("company", "Unknown company"))
     except Exception as e:
-        print("❌ License verification failed:", str(e))
+        print("License verification failed:", str(e))
         return
+    
+    if ENV_FILE.exists():
+        print(f"{ENV_FILE} already exists. Overwrite? [y/N]: ", end="")
+        if input().strip().lower() != "y":
+            print("Aborted.")
+            return
 
     # ask only for essential values
     values = prompt_values(payload)

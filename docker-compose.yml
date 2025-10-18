@@ -8,6 +8,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - ./database:/var/lib/postgresql/data
+      - ./backup:/workspace/backup
 
   web:
     image: ghcr.io/xitoss/distributor-app:latest  # from your GitHub package
@@ -18,12 +19,9 @@ services:
     depends_on:
       - db
     volumes:
-      - ./media:/app/media
       - ./license.pem:/app/license/license.pem
       - ./license_public.pem:/app/license/license_public.pem
-      - ./sys_scripts:/app/sys_scripts # /app/sys_scripts must align with sys_scripts/command_map.py 
-      - ./backup:/app/backup 
-
+      - ./processing:/app/processing
   nginx:
     build:
       context: ./nginx
@@ -58,6 +56,20 @@ services:
               certbot renew --webroot -w /var/www/certbot --quiet;
               sleep 12h & wait $${!};
             done" 
+  
+  agent:
+    build:
+      context: ./sys_scripts
+      dockerfile: Dockerfile.agent
+    restart: unless-stopped
+    volumes:
+      - .:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./backup:/workspace/backup
+      - ./processing:/app/processing
+    working_dir: /workspace
+    network_mode: host
+
 
 
 
