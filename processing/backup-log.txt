@@ -1,8 +1,8 @@
-[2025-10-19 02:33:40] === Distributor Database Backup ===
-[2025-10-19 02:33:40] 🟡 Maintenance mode started.
-[2025-10-19 02:33:40] Starting database backup from container 'distributor-deployment-db-1'...
-[2025-10-19 02:33:40] ✅ Backup complete — 0.15 MB written to D:\Desktop\web project\projects-xitoss\distributor-deployment\backup\database-backup.sql
-[2025-10-19 02:33:40] 🧾 Updated sys_data.json → latest_backup: 2025-10-19 02:33:40
-[2025-10-19 02:33:40] 🟢 Maintenance mode ended.
-[2025-10-19 02:33:40] Backup process finished.
+[2025-10-19 04:36:24 UTC] === Distributor Database Backup ===
+[2025-10-19 04:36:24 UTC] 🟡 Maintenance mode started.
+[2025-10-19 04:36:24 UTC] Starting database backup from container 'distributor-deployment-db-1'...
+[2025-10-19 04:36:25 UTC] ✅ Backup complete — 0.14 MB written to /workspace/backup/database-backup.sql
+[2025-10-19 04:36:25 UTC] 🧾 Updated sys_data.json → latest_backup: 2025-10-19 04:36:25 UTC
+[2025-10-19 04:36:25 UTC] 🟢 Maintenance mode ended.
+[2025-10-19 04:36:25 UTC] Backup process finished.
 ------------------------------------------------------------

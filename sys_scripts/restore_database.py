@@ -2,7 +2,7 @@
 import os
 import subprocess
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 # -------------------------------------------------------------------
@@ -28,7 +28,7 @@ def log(msg: str, append: bool = True):
     if not LOG_FILE.exists():
         LOG_FILE.touch()  # create empty file if missing
 
-    timestamp = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
+    timestamp = datetime.now(timezone.utc).strftime("[%Y-%m-%d %H:%M:%S UTC]")
     line = f"{timestamp} {msg}\n"
     mode = "a" if append else "w"
     with open(LOG_FILE, mode, encoding="utf-8") as f:
@@ -68,9 +68,11 @@ def update_sys_data(key: str, value: str):
     SYS_DATA.write_text(json.dumps(data, indent=2), encoding="utf-8")
     log(f"🧾 Updated sys_data.json → {key}: {value}")
 
-def run(cmd: list[str], stdin=None, allow_error=False) -> subprocess.CompletedProcess:
+
+def run(cmd: list[str], stdin=None, input=None, allow_error=False) -> subprocess.CompletedProcess:
     """Wrapper for subprocess.run with logging."""
-    proc = subprocess.run(cmd, stdin=stdin, capture_output=True, text=True)
+    proc = subprocess.run(cmd, stdin=stdin, input=input, capture_output=True, text=True)
+
     if proc.stdout.strip():
         log(proc.stdout.strip())
     if proc.returncode != 0:
@@ -184,10 +186,10 @@ END$$;
         run([
             "docker", "exec", "-i", DB_CONTAINER,
             "psql", "-U", DB_USER, "-d", DB_NAME, "-v", "ON_ERROR_STOP=1",
-        ], stdin=seq_fix_sql.encode("utf-8"))
+        ], input=seq_fix_sql)
 
         log("✅ Sequences synchronized successfully.")
-        update_sys_data("last_restore", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        update_sys_data("last_restore", datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"))
         log("🎉 Database restore completed successfully.")
 
     except Exception as e:

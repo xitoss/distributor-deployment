@@ -1,13 +1,13 @@
-[2025-10-19 03:01:23] === Distributor Database Restore (CLEAN) ===
-[2025-10-19 03:01:23] 🟡 Maintenance mode started.
-[2025-10-19 03:01:23] Restoring database 'distributor_db' from D:\Desktop\web project\projects-xitoss\distributor-deployment\backup\database-backup.sql using container 'distributor-deployment-db-1'...
-[2025-10-19 03:01:23] pg_terminate_backend 
+[2025-10-19 04:49:18 UTC] === Distributor Database Restore (CLEAN) ===
+[2025-10-19 04:49:18 UTC] 🟡 Maintenance mode started.
+[2025-10-19 04:49:18 UTC] Restoring database 'distributor_db' from /workspace/backup/database-backup.sql using container 'distributor-deployment-db-1'...
+[2025-10-19 04:49:18 UTC] pg_terminate_backend 
 ----------------------
 (0 rows)
-[2025-10-19 03:01:27] DROP DATABASE
-[2025-10-19 03:01:30] CREATE DATABASE
-[2025-10-19 03:01:30] ⏳ Restoring SQL dump into fresh database...
-[2025-10-19 03:02:18] SET
+[2025-10-19 04:49:26 UTC] DROP DATABASE
+[2025-10-19 04:49:32 UTC] CREATE DATABASE
+[2025-10-19 04:49:32 UTC] ⏳ Restoring SQL dump into fresh database...
+[2025-10-19 04:50:26 UTC] SET
 SET
 SET
 SET
@@ -195,7 +195,7 @@ COPY 0
 COPY 1
 COPY 2
 COPY 2
-COPY 1
+COPY 2
 COPY 0
 COPY 3
 COPY 2
@@ -367,7 +367,7 @@ COPY 9
 
  setval 
 --------
-     34
+     35
 (1 row)
 
  setval 
@@ -667,8 +667,11 @@ ALTER TABLE
 ALTER TABLE
 ALTER TABLE
 ALTER TABLE
-[2025-10-19 03:02:18] ✅ SQL restore completed. Running sequence auto-fix...
-[2025-10-19 03:02:18] ❌ Restore failed: 'bytes' object has no attribute 'fileno'
-[2025-10-19 03:02:18] 🟢 Maintenance mode ended.
-[2025-10-19 03:02:18] Restore process finished.
-[2025-10-19 03:02:18] ------------------------------------------------------------
+[2025-10-19 04:50:26 UTC] ✅ SQL restore completed. Running sequence auto-fix...
+[2025-10-19 04:50:27 UTC] DO
+[2025-10-19 04:50:27 UTC] ✅ Sequences synchronized successfully.
+[2025-10-19 04:50:27 UTC] 🧾 Updated sys_data.json → last_restore: 2025-10-19 04:50:27
+[2025-10-19 04:50:27 UTC] 🎉 Database restore completed successfully.
+[2025-10-19 04:50:27 UTC] 🟢 Maintenance mode ended.
+[2025-10-19 04:50:27 UTC] Restore process finished.
+[2025-10-19 04:50:27 UTC] ------------------------------------------------------------

@@ -4,6 +4,9 @@ WORKDIR /workspace
 COPY requirements.txt /workspace/
 RUN pip install --no-cache-dir -r requirements.txt
 
+# instal docker cli to agent, so that could run script using docker 
+RUN apk add --no-cache docker-cli
+
 COPY . /workspace/sys_scripts
 
 CMD ["python3", "sys_scripts/deploy_agent.py"]

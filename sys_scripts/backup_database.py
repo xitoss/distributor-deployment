@@ -19,7 +19,7 @@ import subprocess
 import sys
 import json
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 # ---------------------------------------------------------------------
@@ -45,7 +45,7 @@ os.makedirs(PROCESS_DIR, exist_ok=True)
 # ---------------------------------------------------------------------
 def log(msg: str, append: bool = True):
     """Write log line, optionally overwrite file on first call."""
-    timestamp = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
+    timestamp = datetime.now(timezone.utc).strftime("[%Y-%m-%d %H:%M:%S UTC]")
     line = f"{timestamp} {msg}\n"
     mode = "a" if append else "w"
     with open(LOG_FILE, mode, encoding="utf-8") as f:
@@ -72,7 +72,7 @@ def end_processing():
 
 def update_sys_data():
     """Record latest backup time in sys_data.json."""
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     data = {}
     if SYS_DATA_FILE.exists():
         try:

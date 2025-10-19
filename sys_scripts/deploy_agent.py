@@ -1,24 +1,63 @@
-from flask import Flask, request, jsonify
+#!/usr/bin/env python3
+import os
 import subprocess
-import threading
+from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-def run_script(script_name):
-    cmd = ["python3", f"sys_scripts/{script_name}.py"]
-    proc = subprocess.run(cmd, capture_output=True, text=True)
-    return proc.stdout + proc.stderr
+AGENT_KEY = os.getenv("AGENT_KEY")
+BACKUP_SCRIPT = "/workspace/sys_scripts/backup_database.py"
+RESTORE_SCRIPT = "/workspace/sys_scripts/restore_database.py"
+
+def run_script(script_path):
+    try:
+        result = subprocess.run(
+            ["python3", script_path],
+            capture_output=True,
+            text=True,
+            cwd="/workspace"  # Run inside distributor-deployment
+        )
+        return {
+            "success": result.returncode == 0,
+            "output": (result.stdout or "") + (result.stderr or "")
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+# -------------------------------
+# AUTH DECORATOR
+# -------------------------------
+def require_agent_key(func):
+    from functools import wraps
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        key = request.headers.get("X-AGENT-KEY")
+        if key != AGENT_KEY:
+            return jsonify({"error": "Unauthorized"}), 401
+        return func(*args, **kwargs)
+    return wrapper
+
+# -------------------------------
+# ROUTES
+# -------------------------------
+@app.route("/api/backup", methods=["POST"])
+@require_agent_key
+def api_backup():
+    result = run_script(BACKUP_SCRIPT)
+    return jsonify(result)
 
 @app.route("/api/restore", methods=["POST"])
-def restore():
-    threading.Thread(target=run_script, args=("restore_database",)).start()
-    return jsonify({"status": "ok", "message": "Restore process started"})
+@require_agent_key
+def api_restore():
+    result = run_script(RESTORE_SCRIPT)
+    return jsonify(result)
 
-@app.route("/api/backup", methods=["POST"])
-def backup():
-    threading.Thread(target=run_script, args=("backup_database",)).start()
-    return jsonify({"status": "ok", "message": "Backup process started"})
+@app.route("/api/ping", methods=["GET"])
+def ping():
+    return jsonify({"status": "ok"})
 
-
+# -------------------------------
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=6001)
+    host = os.getenv("AGENT_HOST", "0.0.0.0")
+    port = int(os.getenv("AGENT_PORT", "6001"))
+    app.run(host=host, port=port)

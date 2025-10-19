@@ -62,13 +62,19 @@ services:
       context: ./sys_scripts
       dockerfile: Dockerfile.agent
     restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${AGENT_PORT:-6001}:${AGENT_PORT:-6001}"
     volumes:
       - .:/workspace
-      - /var/run/docker.sock:/var/run/docker.sock
+      - ./database:/workspace/database
       - ./backup:/workspace/backup
-      - ./processing:/app/processing
+      - ./processing:/workspace/processing
+      - /var/run/docker.sock:/var/run/docker.sock
     working_dir: /workspace
-    network_mode: host
+    
+
 
 
 
