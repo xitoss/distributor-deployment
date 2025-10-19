@@ -23,10 +23,10 @@ BACKUP_FILE = BACKUP_DIR / "database-backup.sql"
 # UTILITIES
 # -------------------------------------------------------------------
 def log(msg: str, append: bool = True):
-    """Write log line and print. Auto-create directories and log file."""
+    """Write log line and print to stdout."""
     PROCESS_DIR.mkdir(parents=True, exist_ok=True)
     if not LOG_FILE.exists():
-        LOG_FILE.touch()  # create empty file if missing
+        LOG_FILE.touch()
 
     timestamp = datetime.now(timezone.utc).strftime("[%Y-%m-%d %H:%M:%S UTC]")
     line = f"{timestamp} {msg}\n"
@@ -68,12 +68,11 @@ def update_sys_data(key: str, value: str):
     SYS_DATA.write_text(json.dumps(data, indent=2), encoding="utf-8")
     log(f"🧾 Updated sys_data.json → {key}: {value}")
 
-
-def run(cmd: list[str], stdin=None, input=None, allow_error=False) -> subprocess.CompletedProcess:
-    """Wrapper for subprocess.run with logging."""
+def run(cmd: list[str], stdin=None, input=None, allow_error=False, quiet=False) -> subprocess.CompletedProcess:
+    """Wrapper for subprocess.run with logging and optional quiet mode."""
     proc = subprocess.run(cmd, stdin=stdin, input=input, capture_output=True, text=True)
 
-    if proc.stdout.strip():
+    if not quiet and proc.stdout.strip():
         log(proc.stdout.strip())
     if proc.returncode != 0:
         if allow_error:
@@ -87,15 +86,12 @@ def run(cmd: list[str], stdin=None, input=None, allow_error=False) -> subprocess
 # RESTORE LOGIC
 # -------------------------------------------------------------------
 def restore_database():
-    # Start new log file (overwrite previous)
     log("=== Distributor Database Restore (CLEAN) ===", append=False)
 
     load_env()
     start_processing()
 
     DB_CONTAINER = os.getenv("DB_CONTAINER", "distributor-deployment-db-1")
-
-    # Support both naming schemes; prefer DB_* but fall back to POSTGRES_*
     DB_NAME = os.getenv("DB_NAME") or os.getenv("POSTGRES_DB") or "distributor_db"
     DB_USER = os.getenv("DB_USER") or os.getenv("POSTGRES_USER") or "distributor"
 
@@ -108,44 +104,44 @@ def restore_database():
 
         log(f"Restoring database '{DB_NAME}' from {BACKUP_FILE} using container '{DB_CONTAINER}'...")
 
-        # 1) Terminate active connections (run on postgres DB)
+        # 1) Terminate active connections
         terminate_sql = (
             "SELECT pg_terminate_backend(pid) "
             f"FROM pg_stat_activity WHERE datname='{DB_NAME}' AND pid <> pg_backend_pid();"
         )
         run([
             "docker", "exec", "-i", DB_CONTAINER,
-            "psql", "-U", DB_USER, "-d", "postgres", "-v", "ON_ERROR_STOP=1",
+            "psql", "-q", "-U", DB_USER, "-d", "postgres", "-v", "ON_ERROR_STOP=1",
             "-c", terminate_sql
-        ], allow_error=True)
+        ], allow_error=True, quiet=True)
 
-        # 2) DROP DATABASE (clean slate) — Postgres 15 supports WITH (FORCE)
+        # 2) DROP DATABASE
         drop_db_sql = f"DROP DATABASE IF EXISTS {DB_NAME} WITH (FORCE);"
         run([
             "docker", "exec", "-i", DB_CONTAINER,
-            "psql", "-U", DB_USER, "-d", "postgres", "-v", "ON_ERROR_STOP=1",
+            "psql", "-q", "-U", DB_USER, "-d", "postgres", "-v", "ON_ERROR_STOP=1",
             "-c", drop_db_sql
-        ])
+        ], quiet=True)
 
-        # 3) CREATE DATABASE (owned by app user)
+        # 3) CREATE DATABASE
         create_db_sql = f"CREATE DATABASE {DB_NAME} OWNER {DB_USER};"
         run([
             "docker", "exec", "-i", DB_CONTAINER,
-            "psql", "-U", DB_USER, "-d", "postgres", "-v", "ON_ERROR_STOP=1",
+            "psql", "-q", "-U", DB_USER, "-d", "postgres", "-v", "ON_ERROR_STOP=1",
             "-c", create_db_sql
-        ])
+        ], quiet=True)
 
-        # 4) Restore from SQL dump into the fresh DB
+        # 4) Restore SQL dump (quiet)
         log("⏳ Restoring SQL dump into fresh database...")
         with open(BACKUP_FILE, "r", encoding="utf-8") as f:
             run([
                 "docker", "exec", "-i", DB_CONTAINER,
-                "psql", "-U", DB_USER, "-d", DB_NAME, "-v", "ON_ERROR_STOP=1"
-            ], stdin=f)
+                "psql", "-q", "-U", DB_USER, "-d", DB_NAME, "-v", "ON_ERROR_STOP=1"
+            ], stdin=f, quiet=True)
 
         log("✅ SQL restore completed. Running sequence auto-fix...")
 
-        # 5) Auto-fix all sequences to MAX(id)+1 (public schema)
+        # 5) Fix sequences
         seq_fix_sql = r"""
 DO $$
 DECLARE
@@ -153,7 +149,6 @@ DECLARE
     max_id BIGINT;
     full_seq_name text;
 BEGIN
-  -- Iterate over all sequences owned by table columns in the public schema
   FOR r IN
     SELECT
       n.nspname   AS seq_schema,
@@ -174,7 +169,6 @@ BEGIN
 
     full_seq_name := quote_ident(r.seq_schema) || '.' || quote_ident(r.seq_name);
 
-    -- If table empty -> set to 1, else max+1
     IF max_id = 0 THEN
       EXECUTE format('SELECT setval(%s, 1, false)', quote_literal(full_seq_name));
     ELSE
@@ -185,11 +179,11 @@ END$$;
 """
         run([
             "docker", "exec", "-i", DB_CONTAINER,
-            "psql", "-U", DB_USER, "-d", DB_NAME, "-v", "ON_ERROR_STOP=1",
-        ], input=seq_fix_sql)
+            "psql", "-q", "-U", DB_USER, "-d", DB_NAME, "-v", "ON_ERROR_STOP=1"
+        ], input=seq_fix_sql, quiet=True)
 
         log("✅ Sequences synchronized successfully.")
-        update_sys_data("last_restore", datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"))
+        update_sys_data("last_restore", datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"))
         log("🎉 Database restore completed successfully.")
 
     except Exception as e:
