@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Processing</title>
+    <style>
+        :root {
+            --bg-dark: #0f1115;
+            --card-bg: #1a1d23;
+            --text-main: #e0e0e0;
+            --text-sub: #9aa0a6;
+            --accent: #00bcd4;
+        }
+
+        body {
+            background-color: #0f1115;
+            color: #f0f0f0;
+            font-family: "Inter", "Segoe UI", sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        main {
+            text-align: center;
+            max-width: 600px;
+            padding: 2rem;
+            border: 1px solid #333;
+            border-radius: 12px;
+            background-color: #1a1d23;
+            box-shadow: 0 0 12px rgba(255, 255, 255, 0.05);
+        }
+
+        h2 {
+            font-weight: 500;
+            margin-bottom: 1rem;
+        }
+
+        p {
+            color: #bbb;
+            line-height: 1.5;
+        }
+
+        svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 1.2rem;
+            fill: var(--accent);
+            animation: rotate 4s linear infinite;
+        }
+
+        @keyframes rotate {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+    <script>
+        function checkStatus() {
+            fetch("/processing-status.json?_=" + Date.now())
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.maintaining) {
+                        // First check saved return URL before document.referrer
+                        const returnUrl = sessionStorage.getItem("distributor-return-url");
+                        if (returnUrl) {
+                            sessionStorage.removeItem("distributor-return-url"); // cleanup
+                            location.href = returnUrl;
+                        } else if (document.referrer) {
+                            location.href = document.referrer;
+                        } else {
+                            location.href = "/system/";
+                        }
+                    } else {
+                        setTimeout(checkStatus, 5000);
+                    }
+                })
+                .catch(() => setTimeout(checkStatus, 10000));
+        }
+        setTimeout(checkStatus, 5000);
+    </script>
+</head>
+
+<body>
+
+    <main>
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-repeat"
+            viewBox="0 0 16 16">
+            <path
+                d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41m-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9" />
+            <path fill-rule="evenodd"
+                d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.9A5 5 0 0 0 8 3M3.1 9a5.002 5.002 0 0 0 8.757 2.182.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9z" />
+        </svg>
+        <h2>System Processing</h2>
+        <p>The application is working on your last system processing call. Please hold back until the process is
+            completed. Till then, the application will display Maintenance Page</p>
+    </main>
+
+</body>
+
+</html>

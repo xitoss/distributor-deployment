@@ -37,6 +37,8 @@ services:
       - ./media:/app/media
       - ./static:/app/staticfiles
       - ./nginx/certbot:/var/www/certbot
+      - ./processing:/deployment/processing
+      - ./nginx/maintenance:/var/www/maintenance
     depends_on:
       - web
 
@@ -75,44 +77,3 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     working_dir: /workspace
     
-
-
-
-
-
-
-#### NOTE ###
-# FOR testing create 'docker-compose.override.yml' and paste the following conents
-# services:
-#   web:
-#     build: ../distributor
-#     image: distributor-app:local
-#     restart: unless-stopped
-#     env_file:
-#       - .env
-#     depends_on:
-#       - db
-#     volumes:
-#       - ../distributor:/app
-#       - ./media:/app/media
-#       - ./license.pem:/app/license/license.pem
-#       - ./license_public.pem:/app/license/license_public.pem
-#     ports:
-#       - "8000:8000" 
-#     command: python manage.py runserver 0.0.0.0:8000
-
-#   nginx:
-#     build:
-#       context: ./nginx
-#       dockerfile: Dockerfile.dev
-#     ports:
-#       - "8080:80"
-#     env_file: .env
-#     volumes:
-#       - ./media:/app/media
-#       - ./static:/app/staticfiles
-  
-#   certbot:
-#     image: certbot/certbot
-#     # this will overriede chertbot from actual one and do nothing
-#     entrypoint: ["true"]

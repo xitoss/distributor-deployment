@@ -16,6 +16,7 @@ BACKUP_DIR = PROJECT_ROOT / "backup"
 LOG_FILE = PROCESS_DIR / "restore-log.txt"
 SYS_DATA = PROCESS_DIR / "sys_data.json"
 MAINTAINING_FLAG = PROCESS_DIR / ".maintaining"
+STATUS_FILE = PROCESS_DIR / "processing-status.json"
 
 BACKUP_FILE = BACKUP_DIR / "database-backup.sql"
 
@@ -35,6 +36,10 @@ def log(msg: str, append: bool = True):
         f.write(line)
     print(line, end="")
 
+def set_status(is_maintaining: bool):
+    """Create or update processing-status.json."""
+    STATUS_FILE.write_text(json.dumps({"maintaining": is_maintaining}, indent=2), encoding="utf-8")
+
 def load_env():
     """Load environment variables from .env file."""
     if not ENV_FILE.exists():
@@ -47,12 +52,14 @@ def load_env():
 
 def start_processing():
     PROCESS_DIR.mkdir(parents=True, exist_ok=True)
+    set_status(True)
     MAINTAINING_FLAG.write_text("restoring", encoding="utf-8")
     log("🟡 Maintenance mode started.")
 
 def end_processing():
     if MAINTAINING_FLAG.exists():
         MAINTAINING_FLAG.unlink()
+    set_status(False)
     log("🟢 Maintenance mode ended.")
 
 def update_sys_data(key: str, value: str):

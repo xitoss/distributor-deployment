@@ -32,6 +32,7 @@ PROCESS_DIR = PROJECT_ROOT / "processing"
 LOG_FILE = PROCESS_DIR / "backup-log.txt"
 MAINTAIN_FLAG = PROCESS_DIR / ".maintaining"
 SYS_DATA_FILE = PROCESS_DIR / "sys_data.json"
+STATUS_FILE = PROCESS_DIR / "processing-status.json"
 
 BACKUP_FILE = BACKUP_DIR / "database-backup.sql"
 TEMP_FILE = BACKUP_DIR / "database-backup.tmp"
@@ -52,6 +53,14 @@ def log(msg: str, append: bool = True):
         f.write(line)
     print(line, end="")
 
+def set_status(is_maintaining: bool):
+    """Create or update processing-status.json."""
+    STATUS_FILE.write_text(json.dumps({"maintaining": is_maintaining}, indent=2), encoding="utf-8")
+
+def create_progress_status():
+    """create or update processing-status.json"""
+
+
 def load_env():
     if not ENV_FILE.exists():
         log(f"⚠️  No .env file found at {ENV_FILE}")
@@ -63,12 +72,14 @@ def load_env():
 
 def start_processing():
     MAINTAIN_FLAG.write_text("processing", encoding="utf-8")
+    set_status(True)
     log("🟡 Maintenance mode started.")
 
 def end_processing():
     if MAINTAIN_FLAG.exists():
         MAINTAIN_FLAG.unlink()
-        log("🟢 Maintenance mode ended.")
+    set_status(False)
+    log("🟢 Maintenance mode ended.")
 
 def update_sys_data():
     """Record latest backup time in sys_data.json."""

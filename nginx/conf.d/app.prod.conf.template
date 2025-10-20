@@ -11,6 +11,30 @@ server {
     location / {
         return 301 https://$host$request_uri;
     }
+        if (-f /deployment/processing/.maintaining) {
+        return 503;
+    }
+
+    error_page 503 @maintenance;
+
+    location @maintenance {
+        root /var/www/maintenance;
+        try_files /maintenance.html =503;
+    }
+
+    # --- Static access to manual maintenance or processing pages ---
+    location /maintenance.html {
+        root /var/www/maintenance;
+    }
+
+    location /processing.html {
+        root /var/www/maintenance;
+    }
+
+    location /processing-status.json {
+        root /deployment/processing;
+        add_header Cache-Control "no-cache";
+    }
 }
 
 server {
@@ -26,6 +50,30 @@ server {
 
     location /media/ {
         alias /app/media/;
+    }
+        if (-f /deployment/processing/.maintaining) {
+        return 503;
+    }
+
+    error_page 503 @maintenance;
+
+    location @maintenance {
+        root /var/www/maintenance;
+        try_files /maintenance.html =503;
+    }
+
+    # --- Static access to manual maintenance or processing pages ---
+    location /maintenance.html {
+        root /var/www/maintenance;
+    }
+
+    location /processing.html {
+        root /var/www/maintenance;
+    }
+
+    location /processing-status.json {
+        root /deployment/processing;
+        add_header Cache-Control "no-cache";
     }
 
     location / {
