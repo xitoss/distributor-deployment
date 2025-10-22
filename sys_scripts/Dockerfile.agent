@@ -1,12 +1,17 @@
 FROM python:3.12-alpine
 
 WORKDIR /workspace
-COPY requirements.txt /workspace/
-RUN pip install --no-cache-dir -r requirements.txt
+ENV PYTHONPATH=/workspace
 
-# instal docker cli to agent, so that could run script using docker 
+# Copy and install agent dependencies
+COPY sys_scripts/requirements.txt /workspace/sys_scripts/requirements.txt
+RUN pip install --no-cache-dir -r /workspace/sys_scripts/requirements.txt
+
+# Install docker-cli (needed for backup/restore)
 RUN apk add --no-cache docker-cli
 
-COPY . /workspace/sys_scripts
+# Copy agent code and .env
+COPY sys_scripts /workspace/sys_scripts
+COPY .env /workspace/.env
 
 CMD ["python3", "sys_scripts/deploy_agent.py"]

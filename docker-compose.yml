@@ -1,3 +1,5 @@
+name: xitoss-distributor
+
 services:
   db:
     image: postgres:15
@@ -22,7 +24,8 @@ services:
       - ./license.pem:/app/license/license.pem
       - ./license_public.pem:/app/license/license_public.pem
       - ./processing:/app/processing
-      - ./media:/app/media 
+      - ./media:/app/media
+      - static_volume:/app/staticfiles 
   nginx:
     build:
       context: ./nginx
@@ -35,7 +38,7 @@ services:
     volumes:
       - ./ssl:/etc/letsencrypt
       - ./media:/app/media
-      - ./static:/app/staticfiles
+      - static_volume:/app/staticfiles
       - ./nginx/certbot:/var/www/certbot
       - ./processing:/deployment/processing
       - ./nginx/maintenance:/var/www/maintenance
@@ -62,18 +65,21 @@ services:
   
   agent:
     build:
-      context: ./sys_scripts
-      dockerfile: Dockerfile.agent
+      context: .
+      dockerfile: ./sys_scripts/Dockerfile.agent
     restart: unless-stopped
     env_file:
       - .env
     ports:
       - "${AGENT_PORT:-6001}:${AGENT_PORT:-6001}"
     volumes:
-      - .:/workspace
+      - ./sys_scripts:/workspace/sys_scripts 
       - ./database:/workspace/database
       - ./backup:/workspace/backup
       - ./processing:/workspace/processing
       - /var/run/docker.sock:/var/run/docker.sock
     working_dir: /workspace
-    
+
+
+volumes:
+  static_volume:
