@@ -13,11 +13,12 @@ services:
       - ./backup:/workspace/backup
 
   web:
-    image: ghcr.io/xitoss/distributor-app:latest  # from your GitHub package
+    image: ghcr.io/xitoss/distributor-app:${RUNNING}  # from your GitHub package
     pull_policy: always
     restart: unless-stopped
     env_file:
       - .env
+      - ./version/.env.version
     depends_on:
       - db
     volumes:
@@ -26,6 +27,7 @@ services:
       - ./processing:/app/processing
       - ./media:/app/media
       - static_volume:/app/staticfiles 
+      - ./version:/app/version
   nginx:
     build:
       context: ./nginx
@@ -78,6 +80,7 @@ services:
       - ./backup:/workspace/backup
       - ./processing:/workspace/processing
       - /var/run/docker.sock:/var/run/docker.sock
+      - ./version:/workspace/version
     working_dir: /workspace
 
 

@@ -1,0 +1,16 @@
+{
+    "running": "v1.0.2",
+    "latest": "v1.0.2",
+    "details": {
+        "v1.0.2": {
+            "desc": "Second initial application version",
+            "date": "2025-10-15",
+            "flag": "stable"
+        },
+        "v1.0.1": {
+            "desc": "First initial application version",
+            "date": "2025-10-14",
+            "flag": "broken"
+        }
+    }
+}
