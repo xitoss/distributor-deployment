@@ -13,12 +13,11 @@ services:
       - ./backup:/workspace/backup
 
   web:
-    image: ghcr.io/xitoss/distributor-app:${RUNNING}  # from your GitHub package
-    pull_policy: always
+    image: ghcr.io/xitoss/distributor-app:${RUNNING_APP_VERSION}  # from your GitHub package
+    # pull_policy: always
     restart: unless-stopped
     env_file:
       - .env
-      - ./version/.env.version
     depends_on:
       - db
     volumes:
