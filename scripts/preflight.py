@@ -19,8 +19,6 @@ import secrets
 HERE = Path.cwd()
 ENV_FILE = HERE / ".env"
 
-VERSION_FILE = HERE / "version/version.json"
-
 
 def load_public_key(path: Path):
     with open(path, "rb") as f:
@@ -76,34 +74,8 @@ def prompt_values(payload: dict):
 def generate_secret():
     return secrets.token_urlsafe(50)
 
-def get_app_version(version_type: str):
-    """
-    Reads the 'running' or 'latest' version from version/version.json.
-    Return None if not found
-    """
-    try:
-        if not VERSION_FILE.exists():
-            return None
 
-        data = json.loads(VERSION_FILE.read_text(encoding="utf-8"))
-
-        # basic structure check
-        if not isinstance(data, dict):
-            return None
-
-        if version_type.lower() == "running":
-            return data.get("running")
-        elif version_type.lower() == "latest":
-            return data.get("latest")
-        else:
-            return None
-    except Exception:
-        # any parsing error → fallback to latest or default
-        return None
-
-
-
-def write_env(payload, values, running_version, latest_version):
+def write_env(payload, values):
     # auto-expand allowed hosts
     domain = values["DOMAIN"]
     allowed_hosts = f"{domain},www.{domain},127.0.0.1,localhost"
@@ -137,10 +109,6 @@ def write_env(payload, values, running_version, latest_version):
         # --- License & domain info ---
         "LETSENCRYPT_EMAIL": payload.get("contact_email", "ops@example.com"),
         "DOMAIN": domain,
-
-        # -- app version managing --
-        "RUNNING_APP_VERSION": running_version,
-        "LATEST_APP_VERSION": latest_version,
     }
 
     ENV_FILE.write_text(
@@ -174,24 +142,12 @@ def main():
         if input().strip().lower() != "y":
             print("Aborted.")
             return
-        
 
-    running_version = get_app_version("running")
-    latest_version = get_app_version("latest")
-
-    if not running_version or not latest_version:
-        print("Could not resolve application version from version/version.json")
-        print("Please ensure the version.json file exists and has valid structure, if you have changed it.")
-        print("Contact us for direct support or get the latest file again from the source")
-        return
-    
     # ask only for essential values
     values = prompt_values(payload)
 
-    
-
     # write full .env
-    write_env(payload, values, running_version, latest_version)
+    write_env(payload, values)
 
     print("\nNext steps:")
     print("1) Review and adjust the .env file if needed.")

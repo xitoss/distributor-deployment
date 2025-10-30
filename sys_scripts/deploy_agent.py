@@ -8,6 +8,8 @@ app = Flask(__name__)
 AGENT_KEY = os.getenv("AGENT_KEY")
 BACKUP_SCRIPT = "/workspace/sys_scripts/backup_database.py"
 RESTORE_SCRIPT = "/workspace/sys_scripts/restore_database.py"
+CHECK_UPDATE = "/workspace/sys_scripts/check_update.py"
+APP_UPDATE = "/workspace/sys_scripts/update_application.py"
 
 def run_script(script_path):
     try:
@@ -56,8 +58,17 @@ def api_restore():
 def ping():
     return jsonify({"status": "ok"})
 
+@app.route("/api/check-update", method = ["GET"])
+@require_agent_key
+def api_check_update():
+    result = run_script(CHECK_UPDATE)
+    return jsonify(result)
+
+
+
 # -------------------------------
 if __name__ == "__main__":
     host = os.getenv("AGENT_HOST", "0.0.0.0")
     port = int(os.getenv("AGENT_PORT", "6001"))
     app.run(host=host, port=port)
+

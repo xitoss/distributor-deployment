@@ -1,37 +1,40 @@
 #!/usr/bin/env python3
 import subprocess
+import sys
 import re
 import json
 import time
 from pathlib import Path
 
-from sys_scripts.utils import Context, PROJECT_ROOT
+from sys_scripts.utils import (
+    Context,
+    ENV_FILE,
+    PROJECT_ROOT,
+    RUNNING_APP_VERSION,
+    LATEST_APP_VERSION,
+)
 
-VERSION_DIR = PROJECT_ROOT / "version"
-VERSION_JSON_FILE = VERSION_DIR / "version.json"
-VERSION_ENV_FILE = VERSION_DIR / ".env.version"
+VERSION_JSON_FILE = PROJECT_ROOT / "version/version.json"
 
-# env variable name in .env.version
-RUNNING_VERSION = "RUNNING"
-LATEST_VERSION = "LATEST"
 
 VERSION_PATTERN = re.compile(r"^v\d+\.\d+\.\d+$")
 
 # -------------------------
 # Basic loaders / verifiers
 # -------------------------
-def load_version_env():
-    """Return (True, dict) or (False, error_msg)"""
-    if not VERSION_ENV_FILE.exists():
-        return False, "Missing .env.version"
-    env_data = {}
-    for line in VERSION_ENV_FILE.read_text().splitlines():
-        line = line.strip()
-        if line and not line.startswith("#") and "=" in line:
-            k, v = line.split("=", 1)
-            env_data[k.strip()] = v.strip()
-    return True, env_data
+def validate_version_from_env():
+    if not RUNNING_APP_VERSION:
+        return False, "RUNNING_APP_VERSION in .env is not available"
+    if not LATEST_APP_VERSION:
+        return False, "LATEST_APP_VERSION in .env is not available"
 
+    if not VERSION_PATTERN.match(RUNNING_APP_VERSION):
+        return False, "RUNNING_APP_VERSION in .env is not valid or corrupted!"
+    
+    if not VERSION_PATTERN.match(LATEST_APP_VERSION):
+        return False, "LATEST_APP_VERSION in .env is not valid or corrupted!"
+    
+    return True, None
 
 def load_version_json():
     """Return (True, data_dict) or (False, error_msg)"""
@@ -45,57 +48,53 @@ def load_version_json():
         return False, "version.json missing required keys (running/latest)"
     return True, data
 
-
-def varify_version(version: str) -> bool:
-    if not version:
-        return False
-    return bool(VERSION_PATTERN.match(version))
-
-
-def varify_update(running: str, to_update: str):
-    if not running or not to_update:
-        return False, "Missing version information"
-    if not varify_version(running):
-        return False, "Running version format invalid"
-    if not varify_version(to_update):
-        return False, "Target version format invalid"
-    if running == to_update:
-        return False, "Version is already installed"
+def varify_update(to_update):
+    if not VERSION_PATTERN.match(to_update):
+        return False, f"{to_update} is not a valid version of this application."
+    
+    if RUNNING_APP_VERSION == to_update:
+        return False, f"RUNNING_APP_VERSION is already installed ({to_update})"
+    
     return True, None
+
+def update_env(to_update: str):
+    """Safely update RUNNING_APP_VERSION in .env file."""
+
+    if not ENV_FILE.exists():
+        return False, f".env file not found at {ENV_FILE}"
+
+    try:
+        lines = ENV_FILE.read_text(encoding="utf-8").splitlines()
+        new_lines = []
+        updated = False
+
+        for line in lines:
+            if line.strip().startswith("RUNNING_APP_VERSION="):
+                new_lines.append(f"RUNNING_APP_VERSION={to_update}")
+                updated = True
+            else:
+                new_lines.append(line)
+
+        # If key didn’t exist, append at the end
+        if not updated:
+            new_lines.append(f"RUNNING_APP_VERSION={to_update}")
+
+        # Backup current .env
+        backup_file = ENV_FILE.with_suffix(".bak")
+        backup_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+        # Write new version
+        ENV_FILE.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+
+        return True, None
+
+    except Exception as e:
+        return False, f"Failed to update .env file: {e}"
 
 
 # -------------------------
 # File update helpers
 # -------------------------
-def update_env_version(to_update: str):
-    """Update RUNNING= in .env.version (create if missing)."""
-    if not VERSION_ENV_FILE.exists():
-        return False, ".env.version missing"
-
-    try:
-        lines = VERSION_ENV_FILE.read_text(encoding="utf-8").splitlines()
-    except Exception as e:
-        return False, f"Failed to read .env.version: {e}"
-
-    updated_lines = []
-    found = False
-    for line in lines:
-        if line.strip().startswith(f"{RUNNING_VERSION}="):
-            updated_lines.append(f"{RUNNING_VERSION}={to_update}")
-            found = True
-        else:
-            updated_lines.append(line)
-    if not found:
-        # append at end
-        updated_lines.append(f"{RUNNING_VERSION}={to_update}")
-
-    try:
-        VERSION_ENV_FILE.write_text("\n".join(updated_lines) + "\n", encoding="utf-8")
-        return True, None
-    except Exception as e:
-        return False, f"Failed to write .env.version: {e}"
-
-
 def update_json_version(to_update: str):
     """Update 'running' in version.json"""
     ok, data_or_err = load_version_json()
@@ -196,146 +195,64 @@ def wait_for_container_running(ctx: Context, service_name="web", timeout=120, po
 
 
 # -------------------------
-# High level step wrappers
-# -------------------------
-def step1_check_env_available():
-    ok, data_or_err = load_version_env()
-    if not ok:
-        return False, data_or_err
-    return True, data_or_err
-
-
-def step2_check_json_available():
-    ok, data_or_err = load_version_json()
-    if not ok:
-        return False, data_or_err
-    return True, data_or_err
-
-
-def step3_check_env_versions_valid(env_data: dict):
-    running = env_data.get(RUNNING_VERSION)
-    latest = env_data.get(LATEST_VERSION)
-    if not running:
-        return False, "RUNNING not defined in .env.version"
-    if not latest:
-        return False, "LATEST not defined in .env.version"
-    if not varify_version(running):
-        return False, f"RUNNING '{running}' is not a valid version string"
-    if not varify_version(latest):
-        return False, f"LATEST '{latest}' is not a valid version string"
-    return True, (running, latest)
-
-
-def step4_check_different(running: str, to_update: str):
-    ok, msg = varify_update(running, to_update)
-    if not ok:
-        return False, msg
-    return True, None
-
-
-def step5_update_env(to_update: str):
-    ok, err = update_env_version(to_update)
-    if not ok:
-        return False, err
-    return True, None
-
-
-def step6_compose_build(ctx: Context):
-    ok, out_or_err = run_compose_up_build_web(ctx, PROJECT_ROOT)
-    if not ok:
-        return False, out_or_err
-    return True, out_or_err
-
-
-def step7_update_json(ctx: Context, to_update: str):
-    ok, err = update_json_version(to_update)
-    if not ok:
-        return False, err
-    return True, None
-
-
-def step8_wait_ready(ctx: Context, timeout=180):
-    ok, info = wait_for_container_running(ctx, timeout=timeout)
-    if not ok:
-        return False, info
-    # Optionally: add further readiness checks like HTTP health endpoint here.
-    # e.g., curl mapped port or check application specific endpoint.
-    return True, info
-
-
-# -------------------------
 # Main update flow
 # -------------------------
+
 def update_application(version=None):
     ctx = Context("update")
     ctx.log("== Distributor Update Application ===", append=False)
     ctx.start_processing()
+    ctx.load_env()
 
     try:
-        # Step 1: load .env.version
-        ok, env_or_err = step1_check_env_available(ctx)
+        valid_env, valid_env_err = validate_version_from_env()
+        if not valid_env:
+            ctx.log(valid_env_err)
+            return
+        ctx.log("Validation of versions in .env succeeded")
+
+        valid_json, data_or_err = load_version_json()
+        if not valid_json:
+            ctx.log(data_or_err)
+            return
+        ctx.log("Version.json present and valid")
+
+        to_update = version or LATEST_APP_VERSION
+
+        valid_version, valid_version_err = varify_update(to_update)
+        if not valid_version:
+            ctx.log(valid_version_err)
+            return
+        ctx.log(f"Target version {to_update} selected for update")
+
+        ok, err = update_env(to_update)
         if not ok:
-            ctx.log(f"STEP 1 FAILED: {env_or_err}")
-            return False, env_or_err
-        env_data = env_or_err
-        ctx.log("STEP 1 OK: .env.version loaded")
+            ctx.log(err)
+            return
+        ctx.log(f"Updated .env with RUNNING_APP_VERSION={to_update}")
 
-        # Step 2: validate version.json exists and basic structure
-        ok, json_or_err = step2_check_json_available(ctx)
-        if not ok:
-            ctx.log(f"STEP 2 FAILED: {json_or_err}")
-            return False, json_or_err
-        ctx.log("STEP 2 OK: version.json present and valid")
+        # ok, err = run_compose_up_build_web(ctx, PROJECT_ROOT)
+        # if not ok:
+        #     ctx.log(err)
+        #     return
+        # ctx.log("Docker rebuild successful")
 
-        # Step 3: ensure RUNNING & LATEST in env and valid format
-        ok, running_latest = step3_check_env_versions_valid(ctx, env_data)
-        if not ok:
-            ctx.log(f"STEP 3 FAILED: {running_latest}")
-            return False, running_latest
-        running, latest = running_latest
-        ctx.log(f"STEP 3 OK: running={running}, latest={latest}")
+        # ok, err = update_json_version(to_update)
+        # if not ok:
+        #     ctx.log(err)
+        #     return
+        # ctx.log("version.json updated successfully")
 
-        # decide target
-        to_update = version or latest
-
-        # Step 4: ensure to_update is different & valid
-        ok, msg = step4_check_different(ctx, running, to_update)
-        if not ok:
-            ctx.log(f"STEP 4 FAILED: {msg}")
-            return False, msg
-        ctx.log(f"STEP 4 OK: Will update from {running} -> {to_update}")
-
-        # Step 5: update .env.version (RUNNING=)
-        ok, msg = step5_update_env(ctx, to_update)
-        if not ok:
-            ctx.log(f"STEP 5 FAILED: {msg}")
-            return False, msg
-        ctx.log(f"STEP 5 OK: Updated .env.version RUNNING={to_update}")
-
-        # Step 6: docker compose up -d --build web
-        ok, out_or_err = step6_compose_build(ctx)
-        if not ok:
-            ctx.log(f"STEP 6 FAILED (compose): {out_or_err}")
-            return False, out_or_err
-        ctx.log("STEP 6 OK: Compose build/up succeeded")
-
-        # Step 7: update version.json → set running = to_update
-        ok, msg = step7_update_json(ctx, to_update)
-        if not ok:
-            ctx.log(f"STEP 7 FAILED: {msg}")
-            # NOTE: At this stage .env.version already changed and container built.
-            return False, msg
-        ctx.log("STEP 7 OK: version.json running value updated")
-
-        # Step 8: wait until web container is running / ready
-        ok, info = step8_wait_ready(ctx, timeout=180)
-        if not ok:
-            ctx.log(f"STEP 8 FAILED: {info}")
-            return False, info
-        ctx.log(f"STEP 8 OK: {info}")
-
-        ctx.log("Update completed successfully.")
-        return True, None
+        # ok, container = wait_for_container_running(ctx)
+        # if not ok:
+        #     ctx.log(container)
+        #     return
+        # ctx.log(f"✅ Update completed successfully → {to_update}")
 
     finally:
         ctx.end_processing()
+
+
+if __name__ == "__main__":
+    version_arg = sys.argv[1] if len(sys.argv) > 1 else None
+    update_application(version=version_arg)

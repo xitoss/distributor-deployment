@@ -22,6 +22,7 @@ DB_USER = os.getenv("POSTGRES_USER", "distributor")
 BACKUP_DB_FILE = BACKUP_DIR / "database-backup.sql"
 TEMP_DB_FILE = BACKUP_DIR / "database-backup.tmp"
 
+VERSION_DIR = PROJECT_ROOT / "version"
 
 # -------------------------------------------------------------------
 # MAIN CONTEXT CLASS
