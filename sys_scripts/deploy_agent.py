@@ -58,10 +58,16 @@ def api_restore():
 def ping():
     return jsonify({"status": "ok"})
 
-@app.route("/api/check-update", method = ["GET"])
+@app.route("/api/check-update", methods=["GET"])
 @require_agent_key
 def api_check_update():
     result = run_script(CHECK_UPDATE)
+    return jsonify(result)
+
+@app.route("/api/update-app", methods=["POST"])
+@require_agent_key
+def update_application():
+    result = run_script(APP_UPDATE)
     return jsonify(result)
 
 

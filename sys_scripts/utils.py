@@ -24,6 +24,10 @@ TEMP_DB_FILE = BACKUP_DIR / "database-backup.tmp"
 
 VERSION_DIR = PROJECT_ROOT / "version"
 
+# most updated latest.json will be available in this url
+REPO_LATEST_FILE_URL = "https://raw.githubusercontent.com/xitoss/distributor-deployment/Main/version/latest.json"
+APP_IMAGE_URL = 'ghcr.io/xitoss/distributor-app:latest'
+
 # -------------------------------------------------------------------
 # MAIN CONTEXT CLASS
 # -------------------------------------------------------------------

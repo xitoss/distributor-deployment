@@ -1,258 +1,285 @@
 #!/usr/bin/env python3
 import subprocess
-import sys
-import re
 import json
 import time
-from pathlib import Path
-
+import requests
+import os
+import docker
+from datetime import datetime, timezone
 from sys_scripts.utils import (
-    Context,
-    ENV_FILE,
-    PROJECT_ROOT,
-    RUNNING_APP_VERSION,
-    LATEST_APP_VERSION,
+    Context, 
+    VERSION_DIR, 
+    BACKUP_DB_FILE, 
+    REPO_LATEST_FILE_URL,
+    APP_IMAGE_URL,
 )
 
-VERSION_JSON_FILE = PROJECT_ROOT / "version/version.json"
+RUNNING_JSON = VERSION_DIR / "running.json"
+LATEST_JSON = VERSION_DIR / "latest.json"
 
 
-VERSION_PATTERN = re.compile(r"^v\d+\.\d+\.\d+$")
-
-# -------------------------
-# Basic loaders / verifiers
-# -------------------------
-def validate_version_from_env():
-    if not RUNNING_APP_VERSION:
-        return False, "RUNNING_APP_VERSION in .env is not available"
-    if not LATEST_APP_VERSION:
-        return False, "LATEST_APP_VERSION in .env is not available"
-
-    if not VERSION_PATTERN.match(RUNNING_APP_VERSION):
-        return False, "RUNNING_APP_VERSION in .env is not valid or corrupted!"
+def convert_windows_path_to_docker(path):
+    """
+    Convert Windows path to Docker-compatible path if needed.
+    D:\\path -> /d/path (on Windows)
+    /path/to/dir -> /path/to/dir (on Linux, no change)
+    """
+    # If path already starts with /, it's Unix-style (Linux/Mac)
+    if path.startswith('/'):
+        return path
     
-    if not VERSION_PATTERN.match(LATEST_APP_VERSION):
-        return False, "LATEST_APP_VERSION in .env is not valid or corrupted!"
+    # Windows path detected (has drive letter with colon)
+    if len(path) > 1 and path[1] == ':':
+        drive = path[0].lower()
+        rest = path[2:].replace('\\', '/')
+        return f'/{drive}{rest}'
     
-    return True, None
+    # Fallback: return as-is
+    return path
 
-def load_version_json():
-    """Return (True, data_dict) or (False, error_msg)"""
-    if not VERSION_JSON_FILE.exists():
-        return False, "Missing version.json (risky to continue)"
+
+def get_host_project_path(ctx):
+    """
+    Get the actual host path where the project is located.
+    This is needed to run docker compose from host context.
+    """
     try:
-        data = json.loads(VERSION_JSON_FILE.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        return False, "version.json is invalid JSON"
-    if not isinstance(data, dict) or "running" not in data or "latest" not in data:
-        return False, "version.json missing required keys (running/latest)"
-    return True, data
+        client = docker.from_env()
+        hostname = os.getenv('HOSTNAME')
+        agent_container = client.containers.get(hostname)
+        
+        for mount in agent_container.attrs['Mounts']:
+            if mount['Destination'] == '/workspace':
+                host_path = mount['Source']
+                ctx.log(f"Detected host project path: {host_path}")
+                return host_path
+        
+        raise Exception("Could not find /workspace mount")
+    except Exception as e:
+        ctx.log(f"Error detecting host path: {e}")
+        raise
 
-def varify_update(to_update):
-    if not VERSION_PATTERN.match(to_update):
-        return False, f"{to_update} is not a valid version of this application."
-    
-    if RUNNING_APP_VERSION == to_update:
-        return False, f"RUNNING_APP_VERSION is already installed ({to_update})"
-    
-    return True, None
 
-def update_env(to_update: str):
-    """Safely update RUNNING_APP_VERSION in .env file."""
-
-    if not ENV_FILE.exists():
-        return False, f".env file not found at {ENV_FILE}"
-
+def fetch_latest_json_from_repo(ctx):
+    """
+    although we running this because running.json and latest.json is not same and udpate is necessary.
+    in a edge case: 
+     - user check application, but did not update at that time
+     - then after a long time click on update [but another new version is available]
+     - although latest.json will show a specific version, but this process will install another latest version
+     - this will create confusion in running.json as that will display older version.
+     - so it is safe to get latest.json from "distributor-deployment" repo, rather than /version/latest.json on host.
+     - additionally /version/latest.json also need to use the latest.json from repo now
+    In case failed to it is fully bad luck [should never happen actually] then can fallback to /version/latest.json
+    """
     try:
-        lines = ENV_FILE.read_text(encoding="utf-8").splitlines()
-        new_lines = []
-        updated = False
+        response = requests.get(REPO_LATEST_FILE_URL, timeout=10)
+        response.raise_for_status()
+        remote_data = response.json()
 
-        for line in lines:
-            if line.strip().startswith("RUNNING_APP_VERSION="):
-                new_lines.append(f"RUNNING_APP_VERSION={to_update}")
-                updated = True
-            else:
-                new_lines.append(line)
+        # Try to read local
+        local_data = {}
+        if LATEST_JSON.exists():
+            with open(LATEST_JSON, "r", encoding="utf-8") as f:
+                local_data = json.load(f)
 
-        # If key didn’t exist, append at the end
-        if not updated:
-            new_lines.append(f"RUNNING_APP_VERSION={to_update}")
+        if remote_data != local_data:
+            with open(LATEST_JSON, "w", encoding="utf-8") as f:
+                json.dump(remote_data, f, indent=4)
+            ctx.log("Fetched and updated latest.json from repository.")
+        else:
+            ctx.log("Local latest.json already matches repository.")
 
-        # Backup current .env
-        backup_file = ENV_FILE.with_suffix(".bak")
-        backup_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
-
-        # Write new version
-        ENV_FILE.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
-
-        return True, None
+        return remote_data
 
     except Exception as e:
-        return False, f"Failed to update .env file: {e}"
+        ctx.log(f"Failed to fetch latest.json from repo ({e}), using local fallback.")
+        if LATEST_JSON.exists():
+            with open(LATEST_JSON, "r", encoding="utf-8") as f:
+                return json.load(f)
+        else:
+            raise RuntimeError("Cannot fetch or load any latest.json file.")
 
 
-# -------------------------
-# File update helpers
-# -------------------------
-def update_json_version(to_update: str):
-    """Update 'running' in version.json"""
-    ok, data_or_err = load_version_json()
-    if not ok:
-        return False, data_or_err
-    data = data_or_err
-    data["running"] = to_update
+def run_compose_on_host(ctx, command_list, host_path):
+    """
+    Execute docker compose commands from HOST context (not agent container).
+    
+    This spawns a temporary container that:
+    - Mounts the actual host project directory
+    - Has access to Docker socket
+    - Runs docker compose from the host's perspective
+    
+    Args:
+        ctx: Context object for logging
+        command_list: List of docker compose arguments, e.g., ['up', '-d', 'web']
+        host_path: The actual host path to the project
+    
+    Returns:
+        subprocess.CompletedProcess
+    """
+    docker_path = convert_windows_path_to_docker(host_path)
+    
+    cmd = [
+        'docker', 'run', '--rm',
+        '-v', f'{host_path}:{docker_path}',
+        '-v', '/var/run/docker.sock:/var/run/docker.sock',
+        '-w', docker_path,
+        'docker:cli',
+        'docker', 'compose'
+    ] + command_list
+    
+    ctx.log(f"Running: docker compose {' '.join(command_list)}")
+    
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    
+    if result.returncode == 0:
+        ctx.log(f"✅ docker compose {' '.join(command_list)} succeeded")
+        if result.stdout.strip():
+            ctx.log(f"Output: {result.stdout}")
+    else:
+        ctx.log(f"❌ docker compose {' '.join(command_list)} failed")
+        ctx.log(f"Error: {result.stderr}")
+    
+    return result
+
+
+def validate_files_available(ctx):
+    if not RUNNING_JSON.exists():
+        raise Exception("/version/running.json missing, aborting update!")
+    if not LATEST_JSON.exists():
+        raise Exception("/version/latest.json missing, aborting update!")
+    ctx.log("/version/running.json and /version/latest.json found.")
+
+
+def open_files_data(ctx):
+    running, latest = None, None
     try:
-        VERSION_JSON_FILE.write_text(json.dumps(data, indent=4), encoding="utf-8")
-        return True, None
-    except Exception as e:
-        return False, f"Failed to write version.json: {e}"
-
-
-# -------------------------
-# Docker / Compose helpers
-# -------------------------
-def run_compose_up_build_web(ctx: Context, project_dir: Path):
-    """
-    Bring up web service with build. Tries `docker compose` then `docker-compose`.
-    Returns (True, out) or (False, err)
-    """
-    cmds = [
-        ["docker", "compose", "up", "-d", "--build", "web"],
-        ["docker-compose", "up", "-d", "--build", "web"],
-    ]
-    for cmd in cmds:
-        ctx.log(f"Running: {' '.join(cmd)} (cwd={project_dir})")
-        try:
-            proc = subprocess.run(cmd, cwd=str(project_dir), capture_output=True, text=True, timeout=900)
-            if proc.returncode == 0:
-                ctx.log("Compose returned success.")
-                return True, proc.stdout
-            else:
-                # keep trying next cmd; but log the error
-                ctx.log(f"Compose command failed (rc={proc.returncode}). stdout: {proc.stdout} stderr: {proc.stderr}")
-        except FileNotFoundError:
-            ctx.log(f"Command not found: {cmd[0]}")
-        except subprocess.TimeoutExpired:
-            ctx.log("Compose command timed out.")
-    return False, "Both compose commands failed"
-
-
-def get_compose_container_name(service_name="web", compose_project_label="xitoss-distributor"):
-    """
-    Return the name of the first container for the compose service.
-    Uses docker ps filters to find the container name.
-    """
-    try:
-        result = subprocess.run(
-            [
-                "docker", "ps",
-                "--filter", f"label=com.docker.compose.service={service_name}",
-                "--filter", f"label=com.docker.compose.project={compose_project_label}",
-                "--format", "{{.Names}}"
-            ],
-            capture_output=True, text=True, timeout=10
-        )
-        names = result.stdout.strip().splitlines()
-        if names:
-            return names[0]
+        with open(RUNNING_JSON, "r", encoding="utf-8") as f:
+            running = json.load(f)
     except Exception:
-        pass
-    return None
-
-
-def is_container_running(container_name: str):
-    """Return True if container exists and its .State.Status == 'running'"""
-    if not container_name:
-        return False
+        ctx.log("Error opening /version/running.json.")
     try:
-        proc = subprocess.run(["docker", "inspect", container_name, "--format", "{{.State.Status}}"],
-                              capture_output=True, text=True, timeout=5)
-        status = proc.stdout.strip()
-        return status == "running"
+        with open(LATEST_JSON, "r", encoding="utf-8") as f:
+            latest = json.load(f)
     except Exception:
-        return False
+        ctx.log("Error opening /version/latest.json.")
+    return running, latest
 
 
-def wait_for_container_running(ctx: Context, service_name="web", timeout=120, poll_interval=5):
-    """Poll Docker until the container is in 'running' state or timeout"""
+def validate_update(ctx, running, latest):
+    if running == latest:
+        raise Exception("Already up to date. Abort update.")
+    ctx.log(f"Validated — updating to version {latest}")
+
+
+def delete_db_backup(ctx):
+    if BACKUP_DB_FILE.exists():
+        BACKUP_DB_FILE.unlink()
+        ctx.log("Deleted stale DB backup file.")
+    else:
+        ctx.log("No DB backup file to delete.")
+
+
+def check_containers_running(ctx, timeout=120):
+    """Wait for containers to report 'Up'."""
     start = time.time()
     while True:
-        container_name = get_compose_container_name(service_name=service_name)
-        if container_name:
-            ctx.log(f"Found container: {container_name}. Checking status...")
-            if is_container_running(container_name):
-                ctx.log(f"Container {container_name} is running.")
-                return True, container_name
-            else:
-                ctx.log(f"Container {container_name} not running yet.")
-        else:
-            ctx.log("No container found for service yet.")
-
+        result = subprocess.run(
+            ["docker", "ps", "--format", "{{.Names}}:{{.Status}}"],
+            capture_output=True,
+            text=True
+        )
+        lines = result.stdout.strip().splitlines()
+        all_up = all("Up" in line or "healthy" in line.lower() for line in lines)
+        if all_up:
+            ctx.log("✅ All containers running normally.")
+            return True
         if time.time() - start > timeout:
-            return False, f"Timeout waiting for {service_name} container to run"
-        time.sleep(poll_interval)
+            ctx.log("⚠️ Containers did not reach running state in time.")
+            return False
+        time.sleep(5)
 
 
-# -------------------------
-# Main update flow
-# -------------------------
-
-def update_application(version=None):
-    ctx = Context("update")
-    ctx.log("== Distributor Update Application ===", append=False)
+def update_application():
+    ctx = Context("update-application")
+    ctx.log("=== Distributor Update Application ===", append=False)
     ctx.start_processing()
-    ctx.load_env()
 
     try:
-        valid_env, valid_env_err = validate_version_from_env()
-        if not valid_env:
-            ctx.log(valid_env_err)
-            return
-        ctx.log("Validation of versions in .env succeeded")
+        # Get host path for docker compose operations
+        host_path = get_host_project_path(ctx)
 
-        valid_json, data_or_err = load_version_json()
-        if not valid_json:
-            ctx.log(data_or_err)
-            return
-        ctx.log("Version.json present and valid")
+        # get latest.json from remote or fallback to host
+        fetch_latest_json_from_repo(ctx)
+        
+        # Validate version files
+        validate_files_available(ctx)
+        running_data, latest_data = open_files_data(ctx)
 
-        to_update = version or LATEST_APP_VERSION
+        if not running_data or not latest_data:
+            raise Exception("Version file(s) corrupted or unreadable.")
 
-        valid_version, valid_version_err = varify_update(to_update)
-        if not valid_version:
-            ctx.log(valid_version_err)
-            return
-        ctx.log(f"Target version {to_update} selected for update")
+        running_ver = running_data.get("version")
+        latest_ver = latest_data.get("version")
+        validate_update(ctx, running_ver, latest_ver)
 
-        ok, err = update_env(to_update)
-        if not ok:
-            ctx.log(err)
-            return
-        ctx.log(f"Updated .env with RUNNING_APP_VERSION={to_update}")
+        is_db_migrate = latest_data.get("db-migrate", True)
+        if is_db_migrate:
+            delete_db_backup(ctx)
 
-        # ok, err = run_compose_up_build_web(ctx, PROJECT_ROOT)
-        # if not ok:
-        #     ctx.log(err)
-        #     return
-        # ctx.log("Docker rebuild successful")
+        # Pull latest image
+        ctx.log("Pulling latest web image...")
+        pull_result = subprocess.run(
+            ['docker', 'pull', APP_IMAGE_URL],
+            capture_output=True,
+            text=True
+        )
+        
+        if pull_result.returncode != 0:
+            raise Exception(f"Failed to pull image: {pull_result.stderr}")
+        
+        ctx.log("✅ Image pulled successfully")
 
-        # ok, err = update_json_version(to_update)
-        # if not ok:
-        #     ctx.log(err)
-        #     return
-        # ctx.log("version.json updated successfully")
+        # Update web service using host context
+        ctx.log("Updating web service...")
+        result = run_compose_on_host(ctx, ['up', '-d', '--no-deps', 'web'], host_path)
+        
+        if result.returncode != 0:
+            raise Exception(f"Failed to update web service: {result.stderr}")
 
-        # ok, container = wait_for_container_running(ctx)
-        # if not ok:
-        #     ctx.log(container)
-        #     return
-        # ctx.log(f"✅ Update completed successfully → {to_update}")
+        # Restart nginx to reload and reconnect to new web container
+        ctx.log("Restarting nginx to reload new static content...")
+        nginx_result = run_compose_on_host(ctx, ['restart', 'nginx'], host_path)
+        
+        if nginx_result.returncode != 0:
+            ctx.log("⚠️ Warning: nginx restart failed, but continuing...")
+
+        # Monitor container health
+        ctx.log("Checking container health...")
+        check_containers_running(ctx)
+
+        # Update local version record
+        with open(RUNNING_JSON, "w", encoding="utf-8") as f:
+            json.dump(latest_data, f, indent=4)
+        ctx.log("✅ Updated running.json successfully.")
+
+        # Log timestamp
+        ctx.update_sys_data(
+            "last_app_update",
+            datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        )
+        
+        ctx.log("=== Update completed successfully ===")
+
+    except Exception as e:
+        ctx.log(f"❌ Update Failed: {e}")
+        raise
 
     finally:
         ctx.end_processing()
+        ctx.log("-" * 60)
 
 
 if __name__ == "__main__":
-    version_arg = sys.argv[1] if len(sys.argv) > 1 else None
-    update_application(version=version_arg)
+    update_application()

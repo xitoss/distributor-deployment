@@ -1,7 +1,7 @@
 {
     "version": "v1.0.1",
-    "desc": "Initial testing verrsion for package.",
-    "flag": "broken",
+    "desc": "Introduced system control enabling system functionalities directly from app.",
+    "flag": "stable",
     "db-migrate": true,
-    "date": "2025-10-14"
+    "date": "2025-xx-xx"
 }

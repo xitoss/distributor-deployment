@@ -1,9 +1,11 @@
 import json
 import requests
 from pathlib import Path
-from sys_scripts.utils import VERSION_DIR
+from sys_scripts.utils import (
+    VERSION_DIR, 
+    REPO_LATEST_FILE_URL,
+)
 
-REPO_LATEST_FILE_URL = "https://raw.githubusercontent.com/xitoss/distributor-deployment/Main/version/latest.json"
 HOST_LATEST_VERSION_FILE = VERSION_DIR / "latest.json"
 
 

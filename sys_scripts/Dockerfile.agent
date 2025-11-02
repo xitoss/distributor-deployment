@@ -7,8 +7,8 @@ ENV PYTHONPATH=/workspace
 COPY sys_scripts/requirements.txt /workspace/sys_scripts/requirements.txt
 RUN pip install --no-cache-dir -r /workspace/sys_scripts/requirements.txt
 
-# Install docker-cli (needed for backup/restore)
-RUN apk add --no-cache docker-cli
+# Install docker-cli (needed for backup/restore), additionally docker-cli-compose for update application
+RUN apk add --no-cache docker-cli docker-cli-compose
 
 # Copy agent code and .env
 COPY sys_scripts /workspace/sys_scripts

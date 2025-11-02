@@ -14,7 +14,6 @@ services:
 
   web:
     image: ghcr.io/xitoss/distributor-app:latest  # from your GitHub package
-    # pull_policy: always
     restart: unless-stopped
     env_file:
       - .env
@@ -74,13 +73,23 @@ services:
     ports:
       - "${AGENT_PORT:-6001}:${AGENT_PORT:-6001}"
     volumes:
-      - ./sys_scripts:/workspace/sys_scripts 
-      - ./database:/workspace/database
-      - ./backup:/workspace/backup
-      - ./processing:/workspace/processing
+      - .:/workspace
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./version:/workspace/version
     working_dir: /workspace
+  
+  # agent:
+  #   build:
+  #     context: .
+  #     dockerfile: ./sys_scripts/Dockerfile.agent
+  #   restart: unless-stopped
+  #   env_file:
+  #     - .env
+  #   ports:
+  #     - "${AGENT_PORT:-6001}:${AGENT_PORT:-6001}"
+  #   volumes:
+  #     - ${PWD:-.}:${PWD:-.}
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #   working_dir: ${PWD:-.}
 
 
 volumes:
