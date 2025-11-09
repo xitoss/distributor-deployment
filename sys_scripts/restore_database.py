@@ -6,8 +6,20 @@ from sys_scripts.utils import (
     Context,
     DB_NAME,
     DB_USER,
+    DB_PASSWORD,
     BACKUP_DB_FILE,
 )
+
+"""Safe restore script (high level)
+
+Steps performed:
+1) Validate backup file exists and is non-empty.
+2) Create a temporary database and restore the SQL dump into it.
+3) Run sequence synchronization to ensure serials are correct.
+4) Swap the temporary database into place by dropping the old DB and renaming the temp.
+
+This approach preserves the existing database until the restore is validated.
+"""
 
 # -------------------------------------------------------------------
 # RESTORE LOGIC (Safe -- restore to temp DB then swap)
@@ -15,9 +27,19 @@ from sys_scripts.utils import (
 def restore_database():
     ctx = Context("restore")
     ctx.log("=== Distributor Database Restore (SAFE) ===", append=False)
-    ctx.load_env()
-    ctx.start_processing()
+    
+    entered_maintenance = False
+    # prepare temp DB name early so cleanup can reference it even on early failures
+    TEMP_DB = f"{DB_NAME}_restore_tmp"
 
+    if ctx.is_maintaining():
+        ctx.log("Aborting: maintenance already in progress (found .maintaining).")
+        raise RuntimeError("Another maintenance process is active. Could not start the process.")
+    
+    ctx.start_processing()
+    entered_maintenance = True
+
+    ctx.load_env()
     db_container = ctx.get_db_container()
 
     try:
@@ -31,14 +53,25 @@ def restore_database():
 
         # Helper: run command with logging
         def run(cmd, stdin=None, input=None, allow_error=False, quiet=False):
-            proc = subprocess.run(cmd, stdin=stdin, input=input, capture_output=True, text=True)
+            # Ensure we operate on a mutable copy
+            cmd_list = list(cmd)
+            # If this is a docker exec invocation, inject PGPASSWORD into the exec env
+            try:
+                if len(cmd_list) >= 2 and cmd_list[0] == "docker" and cmd_list[1] == "exec":
+                    if "-e" not in cmd_list:
+                        cmd_list = cmd_list[:2] + ["-e", f"PGPASSWORD={DB_PASSWORD}"] + cmd_list[2:]
+            except Exception:
+                # If something unexpected happens, fall back to original cmd
+                cmd_list = list(cmd)
+
+            proc = subprocess.run(cmd_list, stdin=stdin, input=input, capture_output=True, text=True)
             if not quiet and proc.stdout and proc.stdout.strip():
                 ctx.log(proc.stdout.strip())
             if proc.returncode != 0:
                 if allow_error:
-                    ctx.log(proc.stderr.strip() or "❌ Command failed (ignored).")
+                    ctx.log(proc.stderr.strip() or "Command failed (ignored).")
                 else:
-                    ctx.log(proc.stderr.strip() or "❌ Command failed.")
+                    ctx.log(proc.stderr.strip() or "Command failed.")
                     raise RuntimeError(proc.stderr or "Command failed.")
             return proc
 
@@ -58,7 +91,7 @@ def restore_database():
         # ---------------------------------------------------------------
         # 2) Create temporary database for restore
         # ---------------------------------------------------------------
-        TEMP_DB = f"{DB_NAME}_restore_tmp"
+        # TEMP_DB was defined earlier to ensure cleanup paths can reference it.
         ctx.log(f"Preparing temporary restore database '{TEMP_DB}'...")
 
         # Drop any leftover temp DB (safe cleanup)
@@ -80,19 +113,19 @@ def restore_database():
         # ---------------------------------------------------------------
         # 3) Restore SQL dump into temporary DB
         # ---------------------------------------------------------------
-        ctx.log("⏳ Restoring SQL dump into temporary database...")
+        ctx.log("Restoring SQL dump into temporary database...")
         with open(BACKUP_DB_FILE, "r", encoding="utf-8") as f:
             run([
                 "docker", "exec", "-i", db_container,
                 "psql", "-q", "-U", DB_USER, "-d", TEMP_DB, "-v", "ON_ERROR_STOP=1"
             ], stdin=f, quiet=True)
 
-        ctx.log("✅ SQL restore to temporary database completed successfully.")
+        ctx.log("SQL restore to temporary database completed successfully.")
 
         # ---------------------------------------------------------------
         # 4) Sequence auto-fix on temp DB
         # ---------------------------------------------------------------
-        ctx.log("🔧 Running sequence auto-fix on temporary database...")
+        ctx.log("Running sequence auto-fix on temporary database...")
         seq_fix_sql = r"""
 DO $$
 DECLARE
@@ -133,12 +166,12 @@ END$$;
             "psql", "-q", "-U", DB_USER, "-d", TEMP_DB, "-v", "ON_ERROR_STOP=1"
         ], input=seq_fix_sql, quiet=True)
 
-        ctx.log("✅ Sequences synchronized in temporary database.")
+        ctx.log("Sequences synchronized in temporary database.")
 
         # ---------------------------------------------------------------
         # 5) Swap databases: terminate connections -> drop old -> rename temp
         # ---------------------------------------------------------------
-        ctx.log("🔁 Swapping restored database into place...")
+        ctx.log("Swapping restored database into place...")
 
         # Terminate connections to the old DB
         terminate_sql = (
@@ -167,13 +200,13 @@ END$$;
             "-c", rename_sql
         ], quiet=True)
 
-        ctx.log("✅ Swapped temporary database into place successfully.")
+        ctx.log("Swapped temporary database into place successfully.")
         ctx.update_sys_data("last_restore", datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"))
-        ctx.log("🎉 Database restore completed successfully.")
+        ctx.log("Database restore completed successfully.")
 
     except Exception as e:
         # Keep this verbose so you can debug why the restore failed
-        ctx.log(f"❌ Restore failed: {e}")
+        ctx.log(f"Restore failed: {e}")
 
         # Attempt cleanup of temp DB if it exists (best-effort)
         try:
@@ -189,10 +222,14 @@ END$$;
             pass
 
     finally:
-        ctx.end_processing()
-        ctx.log("Restore process finished.")
+        # Only end processing if we successfully started maintenance.
+        try:
+            if entered_maintenance:
+                ctx.end_processing()
+        except Exception as e:
+            # Log any cleanup issues but don't mask the original exception.
+            ctx.log(f"Error during end_processing(): {e}")
         ctx.log("-" * 60)
-
 
 # -------------------------------------------------------------------
 # ENTRY POINT

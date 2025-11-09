@@ -328,7 +328,7 @@ def update_application():
         nginx_result = run_compose_on_host(ctx, ['restart', 'nginx'], host_path)
         
         if nginx_result.returncode != 0:
-            ctx.log("⚠️ Warning: nginx restart failed, but continuing...")
+            ctx.log("Warning: nginx restart failed, but continuing...")
 
         if not health_check_container(ctx, container_name=DEFAULT_WEB):
             raise Exception(f"Default web health test failing, please contact to technical support.")
@@ -361,7 +361,7 @@ def update_application():
                 ctx.end_processing()
         except Exception as e:
             # Log any cleanup issues but don't mask the original exception.
-            ctx.log(f"⚠️ Error during end_processing(): {e}")
+            ctx.log(f"Error during end_processing(): {e}")
         ctx.log("-" * 60)
 
 

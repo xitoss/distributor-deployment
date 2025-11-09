@@ -19,6 +19,7 @@ STATUS_FILE = PROCESS_DIR / "processing-status.json"
 # DATABASE RELATED CONSTANTS
 DB_NAME = os.getenv("POSTGRES_DB", "distributor_db")
 DB_USER = os.getenv("POSTGRES_USER", "distributor")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
 DRY_RUN = os.getenv("DRY_RUN", "False").lower() in ("1", "true", "yes")
 BACKUP_DB_FILE = BACKUP_DIR / "database-backup.sql"
 TEMP_DB_FILE = BACKUP_DIR / "database-backup.tmp"
@@ -64,7 +65,7 @@ class Context:
     def load_env(self):
         """Load .env file into environment variables."""
         if not ENV_FILE.exists():
-            self.log(f"⚠️  No .env file found at {ENV_FILE}")
+            self.log(f"No .env file found at {ENV_FILE}")
             return
         for line in ENV_FILE.read_text().splitlines():
             if line.strip() and not line.startswith("#") and "=" in line:
@@ -81,14 +82,14 @@ class Context:
         """Enter maintenance mode for this action."""
         self.flag_path.write_text(self.action_type, encoding="utf-8")
         self._set_status(True)
-        self.log(f"🟡 Maintenance mode started ({self.action_type}).")
+        self.log(f"Maintenance mode started ({self.action_type}).")
 
     def end_processing(self):
         """Exit maintenance mode."""
         if self.flag_path.exists():
             self.flag_path.unlink()
         self._set_status(False)
-        self.log("🟢 Maintenance mode ended.")
+        self.log("Maintenance mode ended.")
 
     def is_maintaining(self):
         """Return True if a maintenance flag exists.
@@ -113,7 +114,7 @@ class Context:
                 pass
         data[key] = value
         SYS_DATA.write_text(json.dumps(data, indent=2), encoding="utf-8")
-        self.log(f"🧾 Updated sys_data.json → {key}: {value}")
+        self.log(f"Updated sys_data.json → {key}: {value}")
 
     # ---------------------------------------------------------------
     # DOCKER HELPERS
