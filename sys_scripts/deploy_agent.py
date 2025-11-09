@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import json
 import subprocess
 from flask import Flask, request, jsonify
 
@@ -58,11 +59,32 @@ def api_restore():
 def ping():
     return jsonify({"status": "ok"})
 
+# @app.route("/api/check-update", methods=["GET"])
+# @require_agent_key
+# def api_check_update():
+#     result = run_script(CHECK_UPDATE)
+#     return jsonify(result)
+
 @app.route("/api/check-update", methods=["GET"])
 @require_agent_key
 def api_check_update():
     result = run_script(CHECK_UPDATE)
-    return jsonify(result)
+
+    if isinstance(result, dict) and "output" in result:
+        try:
+            # Parse the script’s printed JSON string
+            parsed_output = json.loads(result["output"])
+            return jsonify(parsed_output)
+        except json.JSONDecodeError:
+            return jsonify({
+                "success": False,
+                "error": "Invalid JSON output to display"
+            })
+    else:
+        return jsonify({
+            "success": False,
+            "error": "Unexpected result from api"
+        })
 
 @app.route("/api/update-app", methods=["POST"])
 @require_agent_key

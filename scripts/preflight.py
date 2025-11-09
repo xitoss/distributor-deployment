@@ -109,6 +109,7 @@ def write_env(payload, values):
         # --- License & domain info ---
         "LETSENCRYPT_EMAIL": payload.get("contact_email", "ops@example.com"),
         "DOMAIN": domain,
+        "DRY_RUN": "False",
     }
 
     ENV_FILE.write_text(
@@ -121,8 +122,8 @@ def write_env(payload, values):
 def main():
     print("=== Preflight Setup ===")
 
-    license_file = HERE / "license.pem"
-    pub_key_file = HERE / "license_public.pem"
+    license_file = HERE / "license/license.pem"
+    pub_key_file = HERE / "license/license_public.pem"
 
     if not pub_key_file.exists() or not license_file.exists():
         print("ERROR: license_public.pem and license.pem must be present in this folder.")

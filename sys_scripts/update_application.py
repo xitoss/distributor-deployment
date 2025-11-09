@@ -12,14 +12,39 @@ from sys_scripts.utils import (
     BACKUP_DB_FILE, 
     REPO_LATEST_FILE_URL,
     APP_IMAGE_URL,
+    DRY_RUN,
 )
+# Planning for updating application
+# app running with xitoss-distributor-web-1, xitoss-distributor-temp-db-1
+# docker web pull [to pull the latest image]
+# docker compose -p dry-distributor up -d web [for testing if latest image ok] 
+# separate network with web and db will be created
+## Network dry-distributor_default
+## Volume "dry-distributor_static_volume"
+## Container dry-distributor-db-1
+## Container dry-distributor-web-1
+# docker inspect -f "{{.State.Health.Status}}" dry-distributor-web-1
+# if healthy [safely can update to latest version]
+# docker compose -p dry-distributor down -v
+# docker compose up -d web [update actual web in xitoss-distributor]
+# health check xitoss-distributor-web-1 until it is healthy and update complete
+# if not healthy [docker compose -p dry-distributor down -v]
+## update will fail, safely remove dry-distributor, app will be still running earlier version
 
 RUNNING_JSON = VERSION_DIR / "running.json"
 LATEST_JSON = VERSION_DIR / "latest.json"
 
 
+DEFAULT_PACKAGE = "xitoss-distributor"
+DRY_PACKAGE = "dry-distributor"
+DEFAULT_WEB = "xitoss-distributor-web-1"
+NGINX_CONTAINER = "xitoss-distributor-nginx-1"
+DRY_WEB = "dry-distributor-web-1"
+
+
 def convert_windows_path_to_docker(path):
     """
+    Not necessary when host is in linux os. but incase running/testing in windows.
     Convert Windows path to Docker-compatible path if needed.
     D:\\path -> /d/path (on Windows)
     /path/to/dir -> /path/to/dir (on Linux, no change)
@@ -103,7 +128,9 @@ def fetch_latest_json_from_repo(ctx):
 
 def run_compose_on_host(ctx, command_list, host_path):
     """
-    Execute docker compose commands from HOST context (not agent container).
+    Running docker compose commands from  agent container does not work, because-yaml file has relative path.
+    when finding the folders [license, database etc] agent container giving wrong location [/workspace/licence].
+    So, docker compose comands must run from host [or relative to host context, which is done in this function].
     
     This spawns a temporary container that:
     - Mounts the actual host project directory
@@ -134,11 +161,11 @@ def run_compose_on_host(ctx, command_list, host_path):
     result = subprocess.run(cmd, capture_output=True, text=True)
     
     if result.returncode == 0:
-        ctx.log(f"✅ docker compose {' '.join(command_list)} succeeded")
+        ctx.log(f"docker compose {' '.join(command_list)} succeeded")
         if result.stdout.strip():
             ctx.log(f"Output: {result.stdout}")
     else:
-        ctx.log(f"❌ docker compose {' '.join(command_list)} failed")
+        ctx.log(f"docker compose {' '.join(command_list)} failed")
         ctx.log(f"Error: {result.stderr}")
     
     return result
@@ -176,12 +203,12 @@ def validate_update(ctx, running, latest):
 def delete_db_backup(ctx):
     if BACKUP_DB_FILE.exists():
         BACKUP_DB_FILE.unlink()
-        ctx.log("Deleted stale DB backup file.")
+        ctx.log("Deleted stale DB backup file. Please create a new backup for udpated app version as database has been changed.")
     else:
         ctx.log("No DB backup file to delete.")
 
 
-def check_containers_running(ctx, timeout=120):
+def check_containers_running(ctx, timeout=300):
     """Wait for containers to report 'Up'."""
     start = time.time()
     while True:
@@ -193,18 +220,46 @@ def check_containers_running(ctx, timeout=120):
         lines = result.stdout.strip().splitlines()
         all_up = all("Up" in line or "healthy" in line.lower() for line in lines)
         if all_up:
-            ctx.log("✅ All containers running normally.")
+            ctx.log("All containers running normally.")
             return True
         if time.time() - start > timeout:
-            ctx.log("⚠️ Containers did not reach running state in time.")
+            ctx.log("Containers did not reach running state in time. Either resolve  it from host or contact technical team.")
             return False
         time.sleep(5)
 
+def health_check_container(ctx, timeout=300, container_name=DEFAULT_WEB):
+    start = time.time()
+    while True:
+        result = subprocess.run(
+            ['docker', 'inspect', '-f', '"{{.State.Health.Status}}"', container_name],
+            capture_output= True,
+            text=True
+        )
+        status = result.stdout.strip().replace('"', '')
+        if status == "healthy":
+            ctx.log(f"{container_name} is healthy.")
+            return True
+        if time.time() - start > timeout:
+            ctx.log(f"{container_name}, did not reach to healthy state in time.")
+            return False
+        time.sleep(10)
 
 def update_application():
     ctx = Context("update-application")
     ctx.log("=== Distributor Update Application ===", append=False)
+
+    # Track whether we actually entered maintenance mode so the
+    # `finally` block can safely decide whether to call `end_processing()`.
+    entered_maintenance = False
+
+    # Abort if another maintenance operation is already in progress.
+    if ctx.is_maintaining():
+        ctx.log("Aborting: maintenance already in progress (found .maintaining).")
+        raise RuntimeError("Another maintenance process is active. Could not start the process.")
+
+    # Start maintenance and mark that we entered maintenance mode.
     ctx.start_processing()
+    entered_maintenance = True
 
     try:
         # Get host path for docker compose operations
@@ -230,19 +285,39 @@ def update_application():
 
         # Pull latest image
         ctx.log("Pulling latest web image...")
-        pull_result = subprocess.run(
-            ['docker', 'pull', APP_IMAGE_URL],
-            capture_output=True,
-            text=True
-        )
+        if not DRY_RUN:
+            pull_result = subprocess.run(
+                ['docker', 'pull', APP_IMAGE_URL],
+                capture_output=True,
+                text=True
+            )
+            
+            if pull_result.returncode != 0:
+                raise Exception(f"Failed to pull image: {pull_result.stderr}")
+            
+            ctx.log("Image pulled successfully")
+        else:
+            ctx.log("Image not actually pulled dry test, mimicing pull")
+
+        # create an testing network for update test
+        ctx.log("Creating a test network for with latest image...")
+        dry_result = run_compose_on_host(ctx, ['-p', DRY_PACKAGE , 'up', '-d', 'web'], host_path)
+        if dry_result.returncode != 0:
+            raise Exception(f"Failed to create the dry network: {dry_result.stderr}")
+
+
+        if not health_check_container(ctx, container_name=DRY_WEB):
+            raise Exception(f"Update aborted, on health test.")
         
-        if pull_result.returncode != 0:
-            raise Exception(f"Failed to pull image: {pull_result.stderr}")
-        
-        ctx.log("✅ Image pulled successfully")
+        ctx.log("Health test passed on dry web container.")
+
+        # delete  dry web with with network
+        result = run_compose_on_host(ctx, ['-p', DRY_PACKAGE, 'down', '-v'], host_path)
+        if result.returncode != 0:
+            raise Exception(f"Failed to remove dry network. update is risky!: {result.stderr}")
 
         # Update web service using host context
-        ctx.log("Updating web service...")
+        ctx.log("Updating actual web service...")
         result = run_compose_on_host(ctx, ['up', '-d', '--no-deps', 'web'], host_path)
         
         if result.returncode != 0:
@@ -255,6 +330,9 @@ def update_application():
         if nginx_result.returncode != 0:
             ctx.log("⚠️ Warning: nginx restart failed, but continuing...")
 
+        if not health_check_container(ctx, container_name=DEFAULT_WEB):
+            raise Exception(f"Default web health test failing, please contact to technical support.")
+
         # Monitor container health
         ctx.log("Checking container health...")
         check_containers_running(ctx)
@@ -262,7 +340,7 @@ def update_application():
         # Update local version record
         with open(RUNNING_JSON, "w", encoding="utf-8") as f:
             json.dump(latest_data, f, indent=4)
-        ctx.log("✅ Updated running.json successfully.")
+        ctx.log("Updated running.json successfully.")
 
         # Log timestamp
         ctx.update_sys_data(
@@ -273,11 +351,17 @@ def update_application():
         ctx.log("=== Update completed successfully ===")
 
     except Exception as e:
-        ctx.log(f"❌ Update Failed: {e}")
+        ctx.log(f"Update Failed: {e}")
         raise
 
     finally:
-        ctx.end_processing()
+        # Only end processing if we successfully started maintenance.
+        try:
+            if entered_maintenance:
+                ctx.end_processing()
+        except Exception as e:
+            # Log any cleanup issues but don't mask the original exception.
+            ctx.log(f"⚠️ Error during end_processing(): {e}")
         ctx.log("-" * 60)
 
 

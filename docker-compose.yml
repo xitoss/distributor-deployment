@@ -11,17 +11,25 @@ services:
     volumes:
       - ./database:/var/lib/postgresql/data
       - ./backup:/workspace/backup
+    
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   web:
     image: ghcr.io/xitoss/distributor-app:latest  # from your GitHub package
+    environment:
+      CONTAINER_NAME: "${COMPOSE_PROJECT_NAME:-xitoss-distributor}-web"
     restart: unless-stopped
     env_file:
       - .env
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     volumes:
-      - ./license.pem:/app/license/license.pem
-      - ./license_public.pem:/app/license/license_public.pem
+      - ./license:/app/license/
       - ./processing:/app/processing
       - ./media:/app/media
       - static_volume:/app/staticfiles 
@@ -77,20 +85,5 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     working_dir: /workspace
   
-  # agent:
-  #   build:
-  #     context: .
-  #     dockerfile: ./sys_scripts/Dockerfile.agent
-  #   restart: unless-stopped
-  #   env_file:
-  #     - .env
-  #   ports:
-  #     - "${AGENT_PORT:-6001}:${AGENT_PORT:-6001}"
-  #   volumes:
-  #     - ${PWD:-.}:${PWD:-.}
-  #     - /var/run/docker.sock:/var/run/docker.sock
-  #   working_dir: ${PWD:-.}
-
-
 volumes:
   static_volume:

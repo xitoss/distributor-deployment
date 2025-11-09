@@ -19,6 +19,7 @@ STATUS_FILE = PROCESS_DIR / "processing-status.json"
 # DATABASE RELATED CONSTANTS
 DB_NAME = os.getenv("POSTGRES_DB", "distributor_db")
 DB_USER = os.getenv("POSTGRES_USER", "distributor")
+DRY_RUN = os.getenv("DRY_RUN", "False").lower() in ("1", "true", "yes")
 BACKUP_DB_FILE = BACKUP_DIR / "database-backup.sql"
 TEMP_DB_FILE = BACKUP_DIR / "database-backup.tmp"
 
@@ -88,6 +89,17 @@ class Context:
             self.flag_path.unlink()
         self._set_status(False)
         self.log("🟢 Maintenance mode ended.")
+
+    def is_maintaining(self):
+        """Return True if a maintenance flag exists.
+
+        This is a lightweight check used by updater scripts to avoid
+        starting another maintenance operation while one is active.
+        """
+        try:
+            return self.flag_path.exists()
+        except Exception:
+            return False
 
     # ---------------------------------------------------------------
     # SYS DATA

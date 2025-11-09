@@ -1,0 +1,65 @@
+services:
+  web:
+    build: ../distributor
+    image: distributor-app:local
+    environment:
+      CONTAINER_NAME: "${COMPOSE_PROJECT_NAME:-xitoss-distributor}-web"
+    restart: unless-stopped
+    pull_policy: never
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ../distributor:/app
+      - ./license:/app/license/
+      - ./processing:/app/processing
+      - ./version:/app/version
+      - ./media:/app/media
+      - static_volume:/app/staticfiles
+
+    expose:
+      - "8000"
+    command: python manage.py runserver 0.0.0.0:8000
+  
+  # web:
+  #   image: ghcr.io/xitoss/distributor-app:latest  # from your GitHub package
+  #   restart: unless-stopped
+  #   env_file:
+  #     - .env
+  #   depends_on:
+  #     - db
+  #   volumes:
+  #     - ./license:/app/license/
+  #     - ./processing:/app/processing
+  #     - ./media:/app/media
+  #     - static_volume:/app/staticfiles
+  #     - ./version:/app/version     
+  #   expose:
+  #     - "8000"
+  #   command: python manage.py runserver 0.0.0.0:8000
+
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8080:80"
+    env_file: .env
+    volumes:
+      - ./media:/app/media
+      - static_volume:/app/staticfiles
+      - ./processing:/deployment/processing
+      - ./nginx/maintenance:/var/www/maintenance
+    
+    depends_on:
+      - web
+  
+  certbot:
+    image: certbot/certbot
+    # this will overriede chertbot from actual one and do nothing
+    entrypoint: ["true"]
+
+volumes:
+  static_volume:

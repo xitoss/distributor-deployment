@@ -1,12 +1,12 @@
 import json
 import requests
-from pathlib import Path
 from sys_scripts.utils import (
     VERSION_DIR, 
     REPO_LATEST_FILE_URL,
 )
 
 HOST_LATEST_VERSION_FILE = VERSION_DIR / "latest.json"
+HOST_RUNNING_VERSION_FILE = VERSION_DIR / "running.json"
 
 
 def check_update():
@@ -32,6 +32,13 @@ def check_update():
         else:
             local_data = {}
 
+        # read local running.json
+        if HOST_RUNNING_VERSION_FILE.exists():
+            with open(HOST_RUNNING_VERSION_FILE, "r", encoding="utf-8") as f:
+                local_running_data = json.load(f)
+        else:
+            local_running_data = {}
+
         # -------------------------------
         # 3. Compare
         # -------------------------------
@@ -40,25 +47,32 @@ def check_update():
             with open(HOST_LATEST_VERSION_FILE, "w", encoding="utf-8") as f:
                 json.dump(remote_data, f, indent=4)
             return {
+                "success": True,
                 "updated": True,
-                "message": "Local latest.json updated from repository.",
-                "remote_version": remote_data,
+                "message": "A new version of found, updated /version/latest.json on host",
+            }
+        
+        elif remote_data == local_running_data:
+            return {
+                "success": True,
+                "updated": False,
+                "message": "Application running version already up to date with latest available version"
             }
 
         return {
+            "success": True,
             "updated": False,
-            "message": "Local latest.json is already up to date.",
-            "remote_version": remote_data,
+            "message": "Application could be updated to a latest version as of /version/latest.json",
         }
 
     except requests.exceptions.RequestException as e:
-        return {"updated": False, "error": f"Network error: {str(e)}"}
+        return {"success": False, "error": f"Network error: {str(e)}"}
 
     except json.JSONDecodeError:
-        return {"updated": False, "error": "Invalid JSON in remote or local file."}
+        return {"success": False, "error": "Invalid JSON in remote or local file."}
 
     except Exception as e:
-        return {"updated": False, "error": str(e)}
+        return {"success": False, "error": str(e)}
 
 
 if __name__ == "__main__":
