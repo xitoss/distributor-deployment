@@ -9,7 +9,7 @@ services:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
-      - ./database:/var/lib/postgresql/data
+      - db_prod:/var/lib/postgresql/data
       - ./backup:/workspace/backup
     
     healthcheck:
@@ -20,8 +20,6 @@ services:
 
   web:
     image: ghcr.io/xitoss/distributor-app:latest  # from your GitHub package
-    environment:
-      CONTAINER_NAME: "${COMPOSE_PROJECT_NAME:-xitoss-distributor}-web"
     restart: unless-stopped
     env_file:
       - .env
@@ -34,6 +32,12 @@ services:
       - ./media:/app/media
       - static_volume:/app/staticfiles 
       - ./version:/app/version
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health/ || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
   nginx:
     build:
       context: ./nginx
@@ -86,4 +90,5 @@ services:
     working_dir: /workspace
   
 volumes:
+  db_prod:
   static_volume:

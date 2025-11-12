@@ -131,6 +131,7 @@ def write_env(values):
         "LETSENCRYPT_EMAIL": values["CONTACT_EMAIL"],
         "DOMAIN": domain,
         "DRY_RUN": "False",
+        "DRY_WEB_PORT": "9560",
     }
 
     ENV_FILE.write_text(
