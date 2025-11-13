@@ -14,32 +14,41 @@ from sys_scripts.utils import (
     APP_IMAGE_URL,
     DRY_RUN,
 )
-# Planning for updating application
-# app running with xitoss-distributor-web-1, xitoss-distributor-temp-db-1
-# docker web pull [to pull the latest image]
-# docker compose -p dry-distributor up -d web [for testing if latest image ok] 
-# separate network with web and db will be created
-## Network dry-distributor_default
-## Volume "dry-distributor_static_volume"
-## Container dry-distributor-db-1
-## Container dry-distributor-web-1
-# docker inspect -f "{{.State.Health.Status}}" dry-distributor-web-1
-# if healthy [safely can update to latest version]
-# docker compose -p dry-distributor down -v
-# docker compose up -d web [update actual web in xitoss-distributor]
-# health check xitoss-distributor-web-1 until it is healthy and update complete
-# if not healthy [docker compose -p dry-distributor down -v]
-## update will fail, safely remove dry-distributor, app will be still running earlier version
+
+
+DEFAULT_WEB = "xitoss-distributor-web-1"
+DRY_DOCKER_FILE = "docker-compose-dry.yml"
+DRY_APP_WEB = "dry-app-web-1"
+DRY_APP_DB = "dry-app-db-1"
 
 RUNNING_JSON = VERSION_DIR / "running.json"
 LATEST_JSON = VERSION_DIR / "latest.json"
 
+"""
+Plan to update application
+Step x: start maintenance mode [actuall app will not serve now]
+Step x: Get actual host path [docker compose  need to run from the context of host, not agent]
+Step x: validate version files `validate_files_available()`
+Step x: Open version files to check if app already up to date or not.
+Step x: deleting any database backup file before pulling the latest image [Important!]
+Step x: run `docker pull app_image_url`
+Step x: build dry containers using DRY_DOCKER_FILE
+This will create DRY_APP_WEB and DRY_APP_DB
+Step x: health test DRY_APP_WEB
+if unhealthy:
+Image cannot be updated as it might have some issues. Abort update
+Just stop the dry containers using DRY_DOCKER_FILE
+if healthy:
+Latest image is ok to update for actual app.
+stop the dry containers using DRY_DOCKER_FILE
+run docker compose up -d --no-deps [to update the actual app]
+restart ngins container
+await until web container is healthy
+update version file [running.json]
+update sys_data
+end maintenence mode [so that app can be live again]
+"""
 
-DEFAULT_PACKAGE = "xitoss-distributor"
-DRY_PACKAGE = "dry-distributor"
-DEFAULT_WEB = "xitoss-distributor-web-1"
-NGINX_CONTAINER = "xitoss-distributor-nginx-1"
-DRY_WEB = "dry-distributor-web-1"
 
 
 def convert_windows_path_to_docker(path):
@@ -208,25 +217,6 @@ def delete_db_backup(ctx):
         ctx.log("No DB backup file to delete.")
 
 
-def check_containers_running(ctx, timeout=300):
-    """Wait for containers to report 'Up'."""
-    start = time.time()
-    while True:
-        result = subprocess.run(
-            ["docker", "ps", "--format", "{{.Names}}:{{.Status}}"],
-            capture_output=True,
-            text=True
-        )
-        lines = result.stdout.strip().splitlines()
-        all_up = all("Up" in line or "healthy" in line.lower() for line in lines)
-        if all_up:
-            ctx.log("All containers running normally.")
-            return True
-        if time.time() - start > timeout:
-            ctx.log("Containers did not reach running state in time. Either resolve  it from host or contact technical team.")
-            return False
-        time.sleep(5)
-
 def health_check_container(ctx, timeout=300, container_name=DEFAULT_WEB):
     start = time.time()
     while True:
@@ -279,9 +269,8 @@ def update_application():
         latest_ver = latest_data.get("version")
         validate_update(ctx, running_ver, latest_ver)
 
-        is_db_migrate = latest_data.get("db-migrate", True)
-        if is_db_migrate:
-            delete_db_backup(ctx)
+        # Deleting backup file here, because i will pull latest image, which will remain in docker swarm anyway.
+        delete_db_backup(ctx)
 
         # Pull latest image
         ctx.log("Pulling latest web image...")
@@ -299,43 +288,24 @@ def update_application():
         else:
             ctx.log("Image not actually pulled dry test, mimicing pull")
 
-        # create an testing network for update test
-        ctx.log("Creating a test network with latest image (no deps to avoid starting DB)...")
-        # Use --no-deps so dependent services (like Postgres) are NOT started.
-        # Starting DB in a dry test can corrupt the live DB when the compose
-        # uses a host bind (./database:/var/lib/postgresql/data). The host
-        # compose file uses a bind to ./database, so we must avoid starting it.
-        dry_result = run_compose_on_host(ctx, ['-p', DRY_PACKAGE, 'up', '-d', '--no-deps', 'web'], host_path)
+        # build dry containers
+        ctx.log(f"Creating dry containers using {DRY_DOCKER_FILE}.")
+
+        dry_result = run_compose_on_host(ctx, ['-f', DRY_DOCKER_FILE, 'up', '-d', '--build'], host_path)
         if dry_result.returncode != 0:
-            raise Exception(f"Failed to create the dry network: {dry_result.stderr}")
+            raise Exception(f"Failed to create the dry containers: {dry_result.stderr}")
 
-        # Instead of requiring a full healthy check (which may need DB), ensure
-        # the dry web container exists and is in an Up state. This avoids touching
-        # the database while still verifying the new image can start.
-        start = time.time()
-        timeout = 120
-        web_up = False
-        while time.time() - start <= timeout:
-            ps = subprocess.run(
-                ["docker", "ps", "--filter", f"name={DRY_WEB}", "--format", "{{{{.Names}}}}:{{{{.Status}}}}"],
-                capture_output=True,
-                text=True
-            )
-            lines = ps.stdout.strip().splitlines()
-            if any(line.startswith(DRY_WEB) and ("Up" in line or "up" in line) for line in lines):
-                web_up = True
-                break
-            time.sleep(2)
+        # Inspect health for dry web container
+        dry_health = health_check_container(ctx, container_name=DRY_APP_WEB)
+        
+        # stop dry containers after getting the health result, containers no longer needed to be run.
+        dry_stop_result= run_compose_on_host(ctx, ['-f', DRY_DOCKER_FILE, 'stop'], host_path)
+        if dry_stop_result.returncode != 0:
+            raise Exception(f"Warning: Failed to Stop Dry Containers: {dry_result.stderr}. Please run this comand in your host shell `docker compose -f {DRY_DOCKER_FILE} stop`")
 
-        if not web_up:
-            ctx.log("Dry web container did not reach Up state in time. Skipping full dry health check to avoid touching DB.")
-        else:
-            ctx.log("Dry web container started (no-deps).")
-
-        # delete  dry web with with network
-        result = run_compose_on_host(ctx, ['-p', DRY_PACKAGE, 'down', '-v'], host_path)
-        if result.returncode != 0:
-            raise Exception(f"Failed to remove dry network. update is risky!: {result.stderr}")
+        if not dry_health:
+            raise Exception(f"Warning: {DRY_APP_WEB} found unhealthy after the update, update could be risky for your the main application. Aborting update.")
+        
 
         # Update web service using host context
         ctx.log("Updating actual web service...")
@@ -352,11 +322,7 @@ def update_application():
             ctx.log("Warning: nginx restart failed, but continuing...")
 
         if not health_check_container(ctx, container_name=DEFAULT_WEB):
-            raise Exception(f"Default web health test failing, please contact to technical support.")
-
-        # Monitor container health
-        ctx.log("Checking container health...")
-        check_containers_running(ctx) 
+            raise Exception(f"Warning: Default web health test failing, please contact to technical support.")
 
         # Update local version record
         with open(RUNNING_JSON, "w", encoding="utf-8") as f:

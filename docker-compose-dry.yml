@@ -10,7 +10,6 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - db_dry:/var/lib/postgresql/data
-      - ./backup:/workspace/backup
     
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
@@ -19,8 +18,7 @@ services:
       retries: 10
   
   web:
-    build: ../distributor
-    image: distributor-app:local
+    image: ghcr.io/xitoss/distributor-app:latest
     restart: unless-stopped
     pull_policy: never
     env_file:
@@ -29,15 +27,10 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - ../distributor:/app
       - ./license:/app/license/
-      - ./processing:/app/processing
-      - ./dry/version:/app/version
-      - ./dry/media:/app/media
-      - static_volume:/app/staticfiles
 
-    ports:
-      - ${DRY_WEB_PORT:-9560}:${DRY_WEB_PORT:-9560}
+    expose:
+      - ${DRY_WEB_PORT:-9560}
     healthcheck:
       test: ["CMD-SHELL", "curl -fs http://localhost:${DRY_WEB_PORT:-9560}/health/ || exit 1"]
       interval: 10s
@@ -46,21 +39,5 @@ services:
 
     command: python manage.py runserver 0.0.0.0:${DRY_WEB_PORT:-9560}
 
-  # web:
-  #   image: ghcr.io/xitoss/distributor-app:latest  # from your GitHub package
-  #   restart: unless-stopped
-  #   env_file:
-  #     - .env
-  #   depends_on:
-  #     db:
-  #       condition: service_healthy
-  #   volumes:
-  #     - ./license:/app/license/
-  #     - ./processing:/app/processing
-  #     - ./dry/media:/app/media
-  #     - ./dry/version:/app/version
-  #     - static_volume:/app/staticfiles 
-  
 volumes:
   db_dry:
-  static_volume:
