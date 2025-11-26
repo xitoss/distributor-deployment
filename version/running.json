@@ -1,5 +1,5 @@
 {
-    "version": "v1.0.3",
+    "version": "v1.0.1",
     "desc": "Introduced system control enabling system functionalities directly from app.",
     "flag": "stable",
     "db-migrate": true,
