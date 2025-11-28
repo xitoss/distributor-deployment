@@ -14,7 +14,7 @@ You can buy VPS hosting from any provider. Our minimum recommendation for produc
 - 4 GB RAM
 - 50 GB NVMe disk
 - 4 TB bandwidth (or suitable for your expected traffic)
-- OS: a recent Ubuntu LTS (recommended), Choose from `Plain Os`
+- OS: a recent Ubuntu LTS, Choose from `Plain Os`, Ubuntu is necessary, because installing several packages has different approach in different OS
 
 If you want a quick option, you can use Hostinger (referral). Click the badge below to open the referral link:
 

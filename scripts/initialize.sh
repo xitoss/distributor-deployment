@@ -4,38 +4,43 @@ set -e
 echo "=== Starting VPS setup ==="
 
 # -------------------------------
-# Update system
+# Update system once
 # -------------------------------
 echo "Updating system..."
 sudo apt update -y
 sudo apt upgrade -y
 
 # -------------------------------
-# Install essential tools
+# Install essential packages once
 # -------------------------------
 echo "Installing essential tools..."
-sudo apt install -y curl git ca-certificates software-properties-common lsb-release gnupg
+sudo apt install -y \
+    curl \
+    git \
+    ca-certificates \
+    software-properties-common \
+    lsb-release \
+    gnupg \
+    python3-venv \
+    python3-pip
 
 # -------------------------------
-# Check & install Python
+# Check & install Python 3.12 if needed
 # -------------------------------
-if command -v python3 &>/dev/null; then
-    PYTHON_BIN=$(command -v python3)
-    echo "Python found: $($PYTHON_BIN --version)"
-else
+PYTHON_BIN=$(command -v python3 || true)
+if [ -z "$PYTHON_BIN" ]; then
     echo "Python3 not found. Installing Python 3.12..."
     sudo apt install -y python3.12 python3.12-venv python3-pip
     PYTHON_BIN=python3.12
+else
+    echo "Python found: $($PYTHON_BIN --version)"
 fi
 
-# Ensure venv package is installed
-sudo apt install -y python3-venv
-
 # -------------------------------
-# Create venv if not exists
+# Create virtual environment if not exists
 # -------------------------------
 if [ ! -d "venv" ]; then
-    echo "Creating virtual environment..."
+    echo "Creating Python virtual environment..."
     $PYTHON_BIN -m venv venv
 else
     echo "Virtual environment already exists."
@@ -44,55 +49,64 @@ fi
 # -------------------------------
 # Activate venv and install Python dependencies
 # -------------------------------
-echo "Activating venv..."
+echo "Activating virtual environment..."
 source venv/bin/activate
 
-# Check pip
-if ! command -v pip &>/dev/null; then
-    echo "pip not found. Installing pip..."
-    curl -sS https://bootstrap.pypa.io/get-pip.py | python
-fi
-
-echo "Upgrading pip..."
+# Upgrade pip
 pip install --upgrade pip
 
+# Install requirements if file exists
 if [ -f "requirements.txt" ]; then
     echo "Installing Python dependencies..."
     pip install -r requirements.txt
 else
-    echo "No requirements.txt found, skipping pip install."
+    echo "No requirements.txt found, skipping Python dependencies installation."
 fi
 
 # -------------------------------
 # Install Docker + Docker Compose v2
 # -------------------------------
-if ! command -v docker &>/dev/null; then
+echo "=== Docker + Docker Compose Setup ==="
+
+if command -v docker &>/dev/null; then
+    echo "Docker is already installed: $(docker --version)"
+else
     echo "Installing Docker..."
-    # Remove old versions
+
+    # Remove old Docker versions if present
     sudo apt remove -y docker docker-engine docker.io containerd runc || true
 
-    # Add Docker GPG key & repo
+    # Add Docker's GPG key
     sudo install -m 0755 -d /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo tee /etc/apt/keyrings/docker.gpg >/dev/null
-    sudo chmod a+r /etc/apt/keyrings/docker.gpg
+    sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+    sudo chmod a+r /etc/apt/keyrings/docker.asc
 
-    echo \
-      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-      https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | \
-      sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
+    # Add Docker repository (deb822 format)
+    sudo tee /etc/apt/sources.list.d/docker.sources > /dev/null <<EOF
+Types: deb
+URIs: https://download.docker.com/linux/ubuntu
+Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+Components: stable
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
 
+    # Update package lists
     sudo apt update -y
+
+    # Install Docker Engine + plugins
     sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-else
-    echo "Docker already installed: $(docker --version)"
+    echo "Docker installed successfully: $(docker --version)"
 fi
 
-echo "=== Docker Compose version ==="
-docker compose version
+# Verify Docker Compose v2
+if command -v docker &>/dev/null; then
+    echo "=== Docker Compose version ==="
+    docker compose version
+fi
 
 # -------------------------------
 # Final message
 # -------------------------------
-echo "VPS initialyzation is completed!"
-echo "Activate (venv) to run preflight.py which will setup prequisites for the application."
+echo "=== VPS initialization completed! ==="
+echo "Activate virtual environment (source venv/bin/activate) to run Python scripts."
