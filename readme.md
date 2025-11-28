@@ -4,9 +4,9 @@ This repository contains the deployment assets, docker-compose configuration and
 
 Once You Puchase our application we will do the installation process for you. Incase you want to do it yourself, follow the `Self Installation Guide` below.
 
-## Prerequisites
+# Prerequisites
 
-1. VPS hosting
+### 1. VPS hosting
 
 You can buy VPS hosting from any provider. Our minimum recommendation for production is:
 
@@ -20,20 +20,68 @@ If you want a quick option, you can use Hostinger (referral). Click the badge be
 
 [![Hostinger - Get VPS](https://img.shields.io/badge/Hostinger-Get%20VPS-blue?style=for-the-badge&logo=hostinger)](https://www.hostinger.com/cart?product=vps%3Avps_kvm_1&period=12&referral_type=cart_link&REFERRALCODE=ZVZANGREDOFQ&referral_id=019a68e1-7338-71b1-b03f-2ebcb6ae13e5)
 
-2. A domain name
+After purchasing the VPS, your provider will show you the VPS you have.
 
-3. DNS pointed to your VPS public IP
+![description](assets/get_ip_of_vps.png)
+
+Keep the ip address noted, you will need in next step.
+
+### 2. Buy a domain for your company.
+
+Your domain will be displayed, by the domain provider.
+
+![description](assets/domain-list.png)
+
+### 3. DNS pointed to your VPS public IP
+
+Click on *manage* of the domain, and got to *DNS / Nameservers* in order to point to your VPS IP address.
+
+You will find many DNS records there, one of them is A Record, by default pointing to an ip address.
+- Delete default A record
+- Create New A record point to *IP Address* that your VPS has.
+
+![description](assets/create_a_record.png)
+
+Thats all, Now your Domain and VPS hosting is ready to install the application.
+
+# Self Installation Guide
+
+### 1. Access the VPS terminal
+There, are many ways you can access to your VPS terminal.
+- Using ssh
+- Using a keygen
+- Or some providers like *Hostinger* provide *Web Terminal*
+
+By far the easiest is to use *Web Terminal*, We also following the same.
+
+Again, Go to Your VPS section, and click on *manage*.
+Details of your VPS will be displayed, and You will find a button *Terminal* to access to web terminal.
+
+![description](assets/vps-manage.png)
+
+Click on that, this will open a terminal, in another tab of your web browser. Which will again, display some information about your vps, we are not interested on those details for now. Type *clear* and hit Enter. This will clear the terminal screen.
+```bash
+clear
+```
 
 
-## Self Installation Guide
 
-### 1. Clone Repository
+### 2. Clone Repository
 Clone this repository on your target VPS:
+
+Paste this into the terminal (Right click > Paste)
 ```bash
 git clone https://github.com/xitoss/distributor-deployment.git
+```
+This will create a directory named "distributor-deployment". All deployment related source code is inside this directory.
+
+Go inside the directory by:
+```bash
 cd distributor-deployment
 ```
-### 2. Setup License
+
+
+### 3. Setup License
 The application requires two license files in the `license/` folder:
 - `license_public.pem` (already included)
 - `license.pem` (you will create this from the provided license file)
@@ -56,49 +104,67 @@ When you purchased this product, we sent you a license file (e.g., `company_lice
 
 To install your license:
 
-1. On your local computer:
+#### A. On your local computer:
    - Open the license file we sent you using Notepad or any text editor
    - Select everything (Ctrl+A) and copy it (Ctrl+C)
 
-2. On your VPS server:
+#### B. On your VPS terminal:
    ```bash
-   # View the current template content (optional)
-   cat license/_license.pem
+   nano license/_license.pem
    ```
-   This file will be completely blank. Paste the license contents  you copied here.
+   This will open the _license.pem file (which will be completely blank initially.)
+
+   ![description](assets/nano_licensepem.png)
+
+   **To paste content, Right click and then Paste as plain text**
+   
+   After pasting the terminal will look like this
+
+    ![description](assets/nano_pasted.png)
+
+   
+
 
    When pasting your license content, make sure to:
    - Include all the content (the entire JSON with payload and signature)
    - Keep all quotes and brackets exactly as they are
-   - Right-click to paste in most terminal applications
 
-3. Rename the file:
+   Save the file by:
+   - CTRL + x [will ask "Save modified buffer?"]
+   - Enter "Y" to the question.
+   - Filename to write: license/_license.pem
+   - Hit "Enter"
+   This will close "nano" with update _license.pem 
+
+#### C. Rename the file to **license.pem**:
    ```bash
    mv license/_license.pem license/license.pem
    ```
    This removes the underscore (_) from the filename.
 
-### 3. Create Virtual Environment
-Setting up a virtual environment is recommended for a clean and stable installation.
+### 4. Initialize your VPS
+In general VPS comes with installed necessary packages to host an application, but it is not gurranteed. In order to install this applicaiton you will need, python3+, docker-compose2+ and some other packages. To make sure, everything is available run this command:
 
 ```bash
-# Create virtual environment
-python -m venv venv
-
-# Activate virtual environment
-# On Linux/Mac:
-source venv/bin/activate
-# On Windows:
-venv\Scripts\activate
-
-# Install required packages
-pip install -r requirements.txt
+bash scripts/initialize.sh
 ```
+This will install 
+- python 3.12
+- python3.12-venv 
+- python3-
+- docker
 
-You'll see `(venv)` in your shell prompt when the virtual environment is active.
-
-### 4. Run Preflight Setup
+### 5. Run Preflight Setup
 The preflight script will create a `.env` file containing all necessary configuration. This file is critical for the application - please do not edit it manually unless you know what you're doing.
+
+First activate virtual environment (This was created in Initialize your VPS). Run this command in terminal.
+
+```bash
+source venv/bin/activate
+```
+You will see (venv) added before your terminal line now. Which indicate virtual environment is active.
+
+
 
 Run the preflight script:
 ```bash
