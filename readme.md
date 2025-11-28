@@ -120,11 +120,9 @@ To install your license:
    
    After pasting the terminal will look like this
 
-    ![description](assets/nano_pasted.png)
+   ![description](assets/nano_pasted.png)
 
    
-
-
    When pasting your license content, make sure to:
    - Include all the content (the entire JSON with payload and signature)
    - Keep all quotes and brackets exactly as they are
