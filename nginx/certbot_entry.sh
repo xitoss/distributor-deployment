@@ -13,7 +13,7 @@ fi
 echo "Checking if certificate already exists for $DOMAIN..."
 
 if [ ! -f /etc/letsencrypt/live/$DOMAIN/fullchain.pem ]; then
-    echo "⚡ Generating initial certificate for $DOMAIN"
+    echo "Generating initial certificate for $DOMAIN"
     certbot certonly \
         --webroot -w /var/www/certbot \
         -d "$DOMAIN" \

@@ -73,8 +73,18 @@ if command -v docker &>/dev/null; then
 else
     echo "Installing Docker..."
 
+    # If old files still available, docker will fail to install...
     # Remove old Docker versions if present
     sudo apt remove -y docker docker-engine docker.io containerd runc || true
+
+    # Remove ALL old Docker repository configurations
+    sudo rm -f /etc/apt/sources.list.d/docker.list
+    sudo rm -f /etc/apt/sources.list.d/docker.sources
+    sudo rm -f /etc/apt/keyrings/docker.asc
+    sudo rm -f /etc/apt/keyrings/docker.gpg
+    sudo rm -f /etc/apt/trusted.gpg.d/docker.gpg
+    # Remove any Docker entries from main sources.list
+    sudo sed -i '/download.docker.com/d' /etc/apt/sources.list
 
     # Add Docker's GPG key
     sudo install -m 0755 -d /etc/apt/keyrings
