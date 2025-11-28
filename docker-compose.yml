@@ -60,21 +60,14 @@ services:
   certbot:
     image: certbot/certbot
     restart: unless-stopped
+    env_file:
+      - .env
+    entrypoint: ["/bin/sh", "/certbot_entry.sh"]
     volumes:
+      - ./nginx/certbot_entry.sh:/certbot_entry.sh
       - ./ssl:/etc/letsencrypt
       - ./nginx/certbot:/var/www/certbot
-    entrypoint: >
-      sh -c "if [ ! -f /etc/letsencrypt/live/${DOMAIN}/fullchain.pem ]; then
-              certbot certonly --webroot -w /var/www/certbot \
-                -d ${DOMAIN} \
-                --email ${LETSENCRYPT_EMAIL} \
-                --agree-tos --non-interactive;
-            fi;
-            trap exit TERM; while :; do
-              certbot renew --webroot -w /var/www/certbot --quiet;
-              sleep 12h & wait $${!};
-            done" 
-  
+
   agent:
     build:
       context: .
