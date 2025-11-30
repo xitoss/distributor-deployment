@@ -5,6 +5,9 @@ server {
     ssl_certificate     /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
 
+    # allow larger uploads
+    client_max_body_size 20M;
+
     location /static/ {
         alias /app/staticfiles/;
     }
@@ -12,7 +15,8 @@ server {
     location /media/ {
         alias /app/media/;
     }
-        if (-f /deployment/processing/.maintaining) {
+    
+    if (-f /deployment/processing/.maintaining) {
         return 503;
     }
 
