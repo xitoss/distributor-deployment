@@ -1,6 +1,20 @@
 #!/bin/bash
 set -e
 
+
+echo "===Creating necessary dirs and adding permission==="
+
+BASE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+DIRS="$BASE_DIR/media $BASE_DIR/processing $BASE_DIR/backup"
+
+for DIR in $DIRS; do
+    mkdir -p "$DIR"
+    echo "$DIR has been created."
+    chmod -R 755 "$DIR"
+    echo "assigend permission for $DIR"
+done
+
+
 echo "=== Starting VPS setup ==="
 
 # -------------------------------

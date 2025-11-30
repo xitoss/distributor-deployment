@@ -30,7 +30,7 @@ services:
       - ./license:/app/license/
       - ./processing:/app/processing
       - ./media:/app/media
-      - static_volume:/app/staticfiles 
+      - static_volume:/app/staticfiles
       - ./version:/app/version
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/health/ || exit 1"]
