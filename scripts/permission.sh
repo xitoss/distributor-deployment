@@ -31,17 +31,17 @@ while ! docker compose exec web id appuser &>/dev/null; do
 done
 
 # Get UID and GID of appuser
-UID=$(docker compose exec web id -u appuser | tr -d '\r')
-GID=$(docker compose exec web id -g appuser | tr -d '\r')
-echo "appuser UID:GID = $UID:$GID"
+APP_UID=$(docker compose exec web id -u appuser | tr -d '\r')
+APP_GID=$(docker compose exec web id -g appuser | tr -d '\r')
+echo "appuser UID:GID = $APP_UID:$APP_GID"
 
 # Create folders and set ownership/permissions
 for DIR in $DIRS; do
     mkdir -p "$DIR"
     echo "$DIR has been created."
-    sudo chown -R "$UID:$GID" "$DIR"
+    sudo chown -R "$APP_UID:$APP_GID" "$DIR"
     chmod -R 775 "$DIR"
-    echo "Assigned ownership $UID:$GID and permissions 775 to $DIR"
+    echo "Assigned ownership $APP_UID:$APP_GID and permissions 775 to $DIR"
 done
 
 echo "=== Permissions setup complete ==="
