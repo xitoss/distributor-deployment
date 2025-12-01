@@ -32,6 +32,7 @@ services:
       - ./media:/app/media
       - static_volume:/app/staticfiles
       - ./version:/app/version
+      - ./backup:/app/backup
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/health/ || exit 1"]
       interval: 20s

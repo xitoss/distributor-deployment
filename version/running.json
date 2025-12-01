@@ -1,7 +1,7 @@
 {
-    "version": "v1.0.1",
-    "desc": "Introduced system control enabling system functionalities directly from app.",
+    "version": "v1.0.3",
+    "desc": "Introduced system control enabling system functionalities directly from app. and added demo contents for fast use.",
     "flag": "stable",
     "db-migrate": true,
-    "date": "2025-xx-xx"
+    "date": "2025-11-26"
 }
