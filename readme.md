@@ -220,6 +220,13 @@ This may take several minutes. Once complete, you can access:
 - Main site: `https://www.yourdomain.com`
 - Admin panel: `https://yourdomain.com/staff_panel`
 
+### 6. Assign permission to application to necessary directories into the host.
+In your server, only root user can have full permission to all directories in the host. Run the below command, which will give permission the application to write and read files inside /media and other necessary directories.
+```bash
+bash scripts/permission.sh
+```
+
+
 ### Next Steps
 1. Log in to the staff panel using your superuser credentials
 2. Complete your company setup
