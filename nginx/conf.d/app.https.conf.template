@@ -1,12 +1,55 @@
+# -----------------------------
+# Flood Protection (GLOBAL)
+# -----------------------------
+limit_req_zone $binary_remote_addr zone=req_limit_per_ip:10m rate=5r/s;
+limit_conn_zone $binary_remote_addr zone=conn_limit_per_ip:10m;
+
 server {
     listen 443 ssl;
     server_name ${DOMAIN};
+
+    # -----------------------------
+    # SECURITY HEADERS
+    # -----------------------------
+    server_tokens off;
+
+    add_header Content-Security-Policy "default-src 'self'" always;
+    add_header X-Frame-Options "deny" always;
+    add_header X-Content-Type-Options "nosniff" always;
+
+    proxy_hide_header X-Runtime;
+    proxy_hide_header X-Powered-By;
+
+    # --- slow client protection ---
+    client_header_timeout 30s;
+    client_body_timeout 60s;
+    send_timeout 30s;
+
+    # buffer POST body before sending to backend
+    proxy_request_buffering on;
 
     ssl_certificate     /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
 
     # allow larger uploads
     client_max_body_size 20M;
+
+    # -----------------------------
+    # Enable Flood Protection
+    # -----------------------------
+    limit_req zone=req_limit_per_ip burst=20 nodelay;
+    limit_conn conn_limit_per_ip 20;
+
+    # ----- Custom Error Pages -----
+    error_page 429 /429.html;
+    error_page 503 /503.html;
+    error_page 413 /413.html;
+    error_page 408 /408.html;
+
+    location ~ ^/(408|413|429|503)\.html$ {
+        root /var/www/safety;
+    }
+
 
     location /static/ {
         alias /app/staticfiles/;
@@ -17,14 +60,14 @@ server {
     }
     
     if (-f /deployment/processing/.maintaining) {
-        return 503;
+        return 599;
     }
 
-    error_page 503 @maintenance;
+    error_page 599 @maintenance;
 
     location @maintenance {
         root /var/www/maintenance;
-        try_files /maintenance.html =503;
+        try_files /maintenance.html =599;
     }
 
     # --- Static access to manual maintenance or processing pages ---

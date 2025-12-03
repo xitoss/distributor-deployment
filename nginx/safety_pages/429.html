@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error 429 - Too Many Requests</title>
+
+    <style>
+        :root {
+            --bg-dark: #0f1115;
+            --card-bg: #1a1d23;
+            --text-main: #e0e0e0;
+            --text-sub: #9aa0a6;
+            --accent: #00bcd4;
+        }
+
+        body {
+            background-color: #0f1115;
+            color: #f0f0f0;
+            font-family: "Inter", "Segoe UI", sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        main {
+            text-align: center;
+            max-width: 600px;
+            padding: 2rem;
+            border: 1px solid #333;
+            border-radius: 12px;
+            background-color: #1a1d23;
+            box-shadow: 0 0 12px rgba(255, 255, 255, 0.05);
+        }
+
+        h2 {
+            font-weight: 500;
+            margin-bottom: 1rem;
+        }
+
+        p {
+            color: #bbb;
+            line-height: 1.5;
+        }
+
+        svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 1.2rem;
+            fill: var(--accent);
+            animation: rotate 4s linear infinite;
+        }
+
+        @keyframes rotate {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <main>
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-ban"
+            viewBox="0 0 16 16">
+            <path
+                d="M15 8a6.97 6.97 0 0 0-1.71-4.584l-9.874 9.875A7 7 0 0 0 15 8M2.71 12.584l9.874-9.875a7 7 0 0 0-9.874 9.874ZM16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0" />
+        </svg>
+
+        <h2>Error 429 — Too Many Requests</h2>
+        <p>You are sending too many requests in a short period of time.
+            Please wait a moment to cool down before trying again.</p>
+    </main>
+
+</body>
+
+</html>

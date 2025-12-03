@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error 408 - Request timeout</title>
+
+    <style>
+        :root {
+            --bg-dark: #0f1115;
+            --card-bg: #1a1d23;
+            --text-main: #e0e0e0;
+            --text-sub: #9aa0a6;
+            --accent: #00bcd4;
+        }
+
+        body {
+            background-color: #0f1115;
+            color: #f0f0f0;
+            font-family: "Inter", "Segoe UI", sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        main {
+            text-align: center;
+            max-width: 600px;
+            padding: 2rem;
+            border: 1px solid #333;
+            border-radius: 12px;
+            background-color: #1a1d23;
+            box-shadow: 0 0 12px rgba(255, 255, 255, 0.05);
+        }
+
+        h2 {
+            font-weight: 500;
+            margin-bottom: 1rem;
+        }
+
+        p {
+            color: #bbb;
+            line-height: 1.5;
+        }
+
+        svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 1.2rem;
+            fill: var(--accent);
+            animation: rotate 4s linear infinite;
+        }
+
+        @keyframes rotate {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <main>
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-speedometer"
+            viewBox="0 0 16 16">
+            <path
+                d="M8 2a.5.5 0 0 1 .5.5V4a.5.5 0 0 1-1 0V2.5A.5.5 0 0 1 8 2M3.732 3.732a.5.5 0 0 1 .707 0l.915.914a.5.5 0 1 1-.708.708l-.914-.915a.5.5 0 0 1 0-.707M2 8a.5.5 0 0 1 .5-.5h1.586a.5.5 0 0 1 0 1H2.5A.5.5 0 0 1 2 8m9.5 0a.5.5 0 0 1 .5-.5h1.5a.5.5 0 0 1 0 1H12a.5.5 0 0 1-.5-.5m.754-4.246a.39.39 0 0 0-.527-.02L7.547 7.31A.91.91 0 1 0 8.85 8.569l3.434-4.297a.39.39 0 0 0-.029-.518z" />
+            <path fill-rule="evenodd"
+                d="M6.664 15.889A8 8 0 1 1 9.336.11a8 8 0 0 1-2.672 15.78zm-4.665-4.283A11.95 11.95 0 0 1 8 10c2.186 0 4.236.585 6.001 1.606a7 7 0 1 0-12.002 0" />
+        </svg>
+
+        <h2>Error 408 - Request Timeout</h2>
+        <p>
+            Your request is taking too long time to complete. Please try again later.
+        </p>
+    </main>
+
+</body>
+
+</html>
