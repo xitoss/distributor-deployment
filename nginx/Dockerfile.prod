@@ -6,6 +6,7 @@ RUN rm -f /etc/nginx/conf.d/default.conf
 # Copy templates
 COPY conf.d/app.http.conf.template /etc/nginx/templates/
 COPY conf.d/app.https.conf.template /etc/nginx/templates/
+COPY conf.d/global.conf /etc/nginx/conf.d/global.conf
 
 # Entry script
 COPY start.sh /start.sh

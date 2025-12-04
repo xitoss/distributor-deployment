@@ -12,6 +12,10 @@ mkdir -p /var/www/certbot
 echo "Generating HTTP config..."
 envsubst '${DOMAIN}' < /etc/nginx/templates/app.http.conf.template > /etc/nginx/conf.d/app.http.conf
 
+# Validate configuration before starting
+echo "Validating Nginx config..."
+nginx -t || (echo "Nginx config test failed" && exit 1)
+
 # Start Nginx in background (HTTP only)
 echo "Starting Nginx (HTTP only) for ACME challenge..."
 nginx -g "daemon off;" &
@@ -32,6 +36,10 @@ fi
 # Enable HTTPS config now that certificate exists
 echo "Generating HTTPS config..."
 envsubst '${DOMAIN}' < /etc/nginx/templates/app.https.conf.template > /etc/nginx/conf.d/app.https.conf
+
+# Validate new configuration before reloading
+echo "Validating Nginx config with HTTPS..."
+nginx -t || (echo "Nginx config test failed after generating HTTPS config" && exit 1)
 
 # Reload Nginx so HTTPS is enabled
 echo "Reloading Nginx with HTTPS..."

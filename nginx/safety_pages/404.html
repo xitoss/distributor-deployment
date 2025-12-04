@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error 404 - Page not found</title>
+
+    <style>
+        :root {
+            --bg-dark: #0f1115;
+            --card-bg: #1a1d23;
+            --text-main: #e0e0e0;
+            --text-sub: #9aa0a6;
+            --accent: #00bcd4;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: "Inter", "Segoe UI", sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        main {
+            text-align: center;
+            max-width: 600px;
+            padding: 2rem;
+            border: 1px solid #333;
+            border-radius: 12px;
+            background-color: var(--card-bg);
+            box-shadow: 0 0 12px rgba(255, 255, 255, 0.05);
+        }
+
+        .code-404 {
+            font-size: 5rem;
+            font-weight: 700;
+            color: var(--accent);
+            letter-spacing: 4px;
+            margin-bottom: 1rem;
+            text-shadow: 0 0 12px rgba(0, 188, 212, 0.4);
+        }
+
+        p {
+            color: #bbb;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+
+<body>
+
+    <main>
+        <div class="code-404">404</div>
+
+        <h2>Error 404 - Page not found</h2>
+        <p>
+            The page you requested does not exists. Please check the Url.
+        </p>
+    </main>
+
+</body>
+
+</html>

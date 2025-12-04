@@ -1,26 +1,24 @@
-# -----------------------------
-# Flood Protection (GLOBAL)
-# -----------------------------
-limit_req_zone $binary_remote_addr zone=req_limit_per_ip:10m rate=5r/s;
-limit_conn_zone $binary_remote_addr zone=conn_limit_per_ip:10m;
-
 server {
     listen 443 ssl;
     server_name ${DOMAIN};
 
-    # -----------------------------
-    # SECURITY HEADERS
-    # -----------------------------
+    # security headers to reduce attack surface and limit impact of common web attacks.
+    
+    # server token off hide server version in the response headers.
     server_tokens off;
 
+    # - HSTS/CSP/Frame/NoSniff reduce downgrade, XSS and clickjacking risks.
     add_header Content-Security-Policy "default-src 'self'" always;
     add_header X-Frame-Options "deny" always;
     add_header X-Content-Type-Options "nosniff" always;
 
+    # hide internal proxy headers so upstream implementation details aren't exposed.
     proxy_hide_header X-Runtime;
     proxy_hide_header X-Powered-By;
 
-    # --- slow client protection ---
+    # tune timeouts and buffering to mitigate slow-client / Slowloris-style attacks.
+    # - Shorter timeouts free resources from slow connections.
+    # - `proxy_request_buffering on` ensures Nginx buffers request bodies before passing to upstream.
     client_header_timeout 30s;
     client_body_timeout 60s;
     send_timeout 30s;
@@ -31,38 +29,56 @@ server {
     ssl_certificate     /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
 
-    # allow larger uploads
+    # limit upload size to prevent resource exhaustion via huge payloads.
+    # Tune `client_max_body_size` for legitimate app needs. We suggested the user to upload images in KBs and webp format.
+    # Adding large size image might make the disk full very first, and client will suffer in future.
     client_max_body_size 20M;
 
-    # -----------------------------
-    # Enable Flood Protection
-    # -----------------------------
+    # per-site request/concurrent-connection limits (zones are declared in global.conf).
+    # - `limit_req` mitigates request-rate floods and brute-force attempts.
+    # - `limit_conn` reduces concurrent-connection floods (helpful for WebSocket/connection storms).
     limit_req zone=req_limit_per_ip burst=20 nodelay;
     limit_conn conn_limit_per_ip 20;
+
+    # --- Server-level proxy headers (inherited by all location blocks) ---
+    # These headers are forwarded to the backend application to preserve request context.
+    # - `Host` preserves the original Host so Django can validate ALLOWED_HOSTS and generate correct absolute URLs.
+    proxy_set_header Host $host;
+    # - `X-Real-IP` passes the immediate client's IP to the app for logging and per-account locking.
+    proxy_set_header X-Real-IP $remote_addr;
+    # - `X-Forwarded-For` preserves the client IP chain for multi-proxy setups.
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    # - `X-Forwarded-Proto` indicates whether the original request was HTTP or HTTPS (important for secure cookies and redirects).
+    proxy_set_header X-Forwarded-Proto $scheme;
 
     # ----- Custom Error Pages -----
     error_page 429 /429.html;
     error_page 503 /503.html;
     error_page 413 /413.html;
     error_page 408 /408.html;
+    error_page 404 /404.html;
 
-    location ~ ^/(408|413|429|503)\.html$ {
+    #Load custom error page, just fancy purpose. looks better when user see those error pages.
+    location ~ ^/(404|408|413|429|503)\.html$ {
         root /var/www/safety;
     }
 
-
+    # App get static files typical django setups
     location /static/ {
         alias /app/staticfiles/;
     }
 
+    # App get media file refeference form this mounted directory
     location /media/ {
         alias /app/media/;
     }
     
+    # When there is a .maintaining file, server is doing some maintenance jobs, example: update application
     if (-f /deployment/processing/.maintaining) {
         return 599;
     }
 
+    # Special maintenance page, considering an error_page to render the page from nginx
     error_page 599 @maintenance;
 
     location @maintenance {
@@ -70,25 +86,48 @@ server {
         try_files /maintenance.html =599;
     }
 
-    # --- Static access to manual maintenance or processing pages ---
+    # Static access to manual maintenance or processing pages
     location /maintenance.html {
         root /var/www/maintenance;
     }
 
+    # The person who excecuted any maintenance related task,  will see this html page. Any others will see maintenance page
     location /processing.html {
         root /var/www/maintenance;
     }
 
+    # A small file to track any processing status. managed and updates by agent service.
     location /processing-status.json {
         root /deployment/processing;
         add_header Cache-Control "no-cache";
     }
 
+    # block probes for common sensitive files (git/.env) to avoid accidental disclosure.
+    location ~* /(\.env|\.git|\.htaccess|\.htpasswd|LICENSE|readme|README) {
+        deny all;
+        return 404;
+    }
+
+    # Login throttling
+    # a stricter per-IP request limit specifically for the auth endpoints.
+    # This uses the `req_limit_login` zone (declared in global.conf) to slow or block brute-force attempts.
+    # Behavior: allow small bursts, otherwise reject excess requests with 429.
+
+    location ~* /login/?$ {
+        # Throttle: uses `req_limit_login` (rate tuned for auth attempts).
+        limit_req zone=req_limit_login burst=5 nodelay;
+        # Return 429 when limit exceeded (error_page 429 already configured above)
+        limit_req_status 429;
+
+        # Send the request to the application upstream.
+        # - `proxy_pass http://web;` forwards the request to the backend service listening on port 8000.
+        proxy_pass http://web;
+        # - Proxy headers (Host, X-Real-IP, X-Forwarded-For, X-Forwarded-Proto) are inherited from server level.
+    }
+
+    # proxy application requests to the upstream `web` service (defined in global.conf).
+    # Headers (Host, X-Real-IP, X-Forwarded-For, X-Forwarded-Proto) are inherited from server level.
     location / {
-        proxy_pass http://web:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_pass http://web;
     }
 }
