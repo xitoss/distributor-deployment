@@ -2,8 +2,6 @@ services:
   web:
     build: ../distributor
     image: distributor-app:local
-    environment:
-      CONTAINER_NAME: "${COMPOSE_PROJECT_NAME:-xitoss-distributor}-web"
     restart: unless-stopped
     pull_policy: never
     env_file:
@@ -16,11 +14,19 @@ services:
       - ./license:/app/license/
       - ./processing:/app/processing
       - ./version:/app/version
+      - ./backup:/app/backup
       - ./media:/app/media
       - static_volume:/app/staticfiles
 
-    expose:
-      - "8000"
+    ports:
+      - 8000:8000
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8000/health/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
     command: python manage.py runserver 0.0.0.0:8000
   
   # web:
@@ -38,6 +44,11 @@ services:
   #     - ./version:/app/version     
   #   expose:
   #     - "8000"
+  # healthcheck:
+  #     test: ["CMD-SHELL", "curl -fs http://localhost/health/ || exit 1"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
   #   command: python manage.py runserver 0.0.0.0:8000
 
   nginx:
@@ -52,6 +63,7 @@ services:
       - static_volume:/app/staticfiles
       - ./processing:/deployment/processing
       - ./nginx/maintenance:/var/www/maintenance
+      - ./nginx/safety_pages:/var/www/safety
     
     depends_on:
       - web
@@ -62,4 +74,5 @@ services:
     entrypoint: ["true"]
 
 volumes:
+  db_prod:
   static_volume:

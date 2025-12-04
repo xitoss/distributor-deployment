@@ -45,3 +45,17 @@ for DIR in $DIRS; do
 done
 
 echo "=== Permissions setup complete ==="
+
+echo "=== creating running.json file from latest.json file, to track applications curring running version. ==="
+
+# Generate running.json from latest.json if it does not exist
+# this way, running.json will not be updated when git pull is called.
+RUNNING_VERSION_FILE="$BASE_DIR/version/running.json"
+LATEST_VERSION_FILE="$BASE_DIR/version/latest.json"
+
+if [ ! -f "$RUNNING_VERSION_FILE" ]; then
+    cp "$LATEST_VERSION_FILE" "$RUNNING_VERSION_FILE"
+    echo "Created $RUNNING_FILE from latest.json"
+fi
+
+echo "=== version/running.json setup cmpleted ==="
