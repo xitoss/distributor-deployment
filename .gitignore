@@ -1,16 +1,45 @@
-venv-deploy
-license.pem
-.env
-database/
-media/
-staticfiles/
-static/
-backup/
-ssl/
-certbot/
-docker-compose.override.yml
+# venv-deploy
+# license.pem
+# .env
+# database/
+# media/
+# staticfiles/
+# static/
+# backup/
+# ssl/
+# certbot/
+# docker-compose.override.yml
+# __pycache__/
+# *.pyc
+# processing/
+# .github/copilot-instructions.md
+
+# Python & environment
 __pycache__/
 *.pyc
-processing/
+.env
+license.pem
+
+# Virtual environments (any folder name containing "venv")
+*venv*/
+
+# SSL related directories
+*ssl*/
+
+# Certbot related directories
+*certbot*/
+
+# Deployment-specific
+docker-compose.override.yml
+
+# App-generated directories
+*backup*/
+*media*/
+*processing*/
+
+
+# copilot instructions not neccesary in git
 .github/copilot-instructions.md
 
+# running.json file that have current running version of the application
+version/running.json
