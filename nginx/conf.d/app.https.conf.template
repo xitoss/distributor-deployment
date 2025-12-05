@@ -61,7 +61,6 @@ server {
     #Load custom error page, just fancy purpose. looks better when user see those error pages.
     location ~ ^/(404|408|413|429|503)\.html$ {
         root /var/www/safety;
-        access_log /var/log/nginx/429.log main_extended;
     }
 
 
