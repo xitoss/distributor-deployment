@@ -63,6 +63,14 @@ server {
         root /var/www/safety;
     }
 
+
+    # Health check endpoint: always allow, never rate-limited
+    location = /health/ {
+        limit_req off;
+        proxy_pass http://web;
+        # Proxy headers inherited from server level
+    }
+
     # App get static files typical django setups
     location /static/ {
         alias /app/staticfiles/;
