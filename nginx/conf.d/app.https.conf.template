@@ -52,6 +52,7 @@ server {
     # - `limit_req` mitigates request-rate floods and brute-force attempts.
     # - `limit_conn` reduces concurrent-connection floods (helpful for WebSocket/connection storms).
     limit_req zone=req_limit_per_ip burst=20 nodelay;
+    limit_req_status 429; 
     limit_conn conn_limit_per_ip 20;
 
     # --- Server-level proxy headers (inherited by all location blocks) ---
