@@ -66,7 +66,7 @@ server {
 
     # Health check endpoint: always allow, never rate-limited
     location = /health/ {
-        limit_req off;
+        limit_req zone=no_limit;
         proxy_pass http://web;
         # Proxy headers inherited from server level
     }
