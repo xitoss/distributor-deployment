@@ -9,6 +9,7 @@ server {
 
     # - HSTS/CSP/Frame/NoSniff reduce downgrade, XSS and clickjacking risks.
     # add_header Content-Security-Policy "default-src 'self'" always;
+    # add_header X-Frame-Options "deny" always;
     add_header Content-Security-Policy "
         default-src 'self';
         script-src 'self' https:;
@@ -17,12 +18,11 @@ server {
         font-src 'self' data: https:;
         connect-src 'self' https:;
         object-src 'none';
-        frame-ancestors 'none';
-    " always;
 
-    # add_header X-Frame-Options "deny" always;
-    add_header Content-Security-Policy "
+        # nobody can iframe our site
         frame-ancestors 'self';
+
+        # our site can iframe anything
         frame-src *;
         media-src *;
     " always;
