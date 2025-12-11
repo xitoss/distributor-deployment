@@ -1,7 +1,7 @@
 {
-    "version": "v1.0.3",
-    "desc": "Introduced system control enabling system functionalities directly from app. and added demo contents for fast use.",
+    "version": "v1.0.4",
+    "desc": "Introduce quotation management, several bugfix, ui improvement",
     "flag": "stable",
     "db-migrate": true,
-    "date": "2025-11-26"
+    "date": "2025-12-11"
 }
