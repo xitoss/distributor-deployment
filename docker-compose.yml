@@ -58,18 +58,7 @@ services:
       - ./nginx/safety_pages:/var/www/safety
     depends_on:
       - web
-
-  certbot:
-    image: certbot/certbot
-    restart: unless-stopped
-    env_file:
-      - .env
-    entrypoint: ["/bin/sh", "/certbot_entry.sh"]
-    volumes:
-      - ./nginx/certbot_entry.sh:/certbot_entry.sh
-      - ./ssl:/etc/letsencrypt
-      - ./nginx/certbot:/var/www/certbot
-
+      
   agent:
     build:
       context: .

@@ -5,45 +5,93 @@ set -e
 : "${DOMAIN:?Need to set DOMAIN}"
 : "${LETSENCRYPT_EMAIL:?Need to set LETSENCRYPT_EMAIL}"
 
-# Create Certbot webroot if not exists
+# AUTO-GENERATE www subdomain from single domain
+PRIMARY_DOMAIN="$DOMAIN"
+WWW_DOMAIN="www.$DOMAIN"
+ALL_DOMAINS="$PRIMARY_DOMAIN $WWW_DOMAIN"
+
+echo "=== Starting SSL Setup ==="
+echo "Primary domain: $PRIMARY_DOMAIN"
+echo "WWW domain: $WWW_DOMAIN"
+echo "Certificate will cover both domains"
+
+# Create necessary directories
 mkdir -p /var/www/certbot
+mkdir -p /etc/letsencrypt/live
 
-# Always enable HTTP
-echo "Generating HTTP config..."
-envsubst '${DOMAIN}' < /etc/nginx/templates/app.http.conf.template > /etc/nginx/conf.d/app.http.conf
+# Generate HTTP-only config for ACME challenge
+echo "Step 1: Generating HTTP-only config..."
+export NGINX_SERVER_NAME="$ALL_DOMAINS"
+envsubst '${NGINX_SERVER_NAME}' < /etc/nginx/templates/app.http.conf.template > /etc/nginx/conf.d/default.conf
 
-# Validate configuration before starting
-echo "Validating Nginx config..."
-nginx -t || (echo "Nginx config test failed" && exit 1)
+# Validate and start Nginx with HTTP only
+echo "Step 2: Starting Nginx (HTTP only)..."
+nginx -t
+nginx
 
-# Start Nginx in background (HTTP only)
-echo "Starting Nginx (HTTP only) for ACME challenge..."
-nginx -g "daemon off;" &
-NGINX_PID=$!
+# Wait for Nginx to be ready
+sleep 3
 
-# Wait a few seconds to ensure Nginx is fully up
-sleep 5
-
-# Generate SSL certificate if it does not exist
-if [ ! -f "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" ]; then
-    echo "Creating initial SSL certificate for $DOMAIN..."
-    certbot certonly --webroot -w /var/www/certbot \
-        -d "$DOMAIN" \
+# Check if certificate already exists
+if [ -f "/etc/letsencrypt/live/${PRIMARY_DOMAIN}/fullchain.pem" ]; then
+    echo "Step 3: SSL certificate already exists, skipping generation"
+else
+    echo "Step 3: Obtaining SSL certificate for $PRIMARY_DOMAIN and $WWW_DOMAIN..."
+    
+    # Get certificate for both domains
+    if certbot certonly \
+        --webroot \
+        -w /var/www/certbot \
+        -d "$PRIMARY_DOMAIN" \
+        -d "$WWW_DOMAIN" \
         --email "$LETSENCRYPT_EMAIL" \
-        --agree-tos --non-interactive --no-eff-email
+        --agree-tos \
+        --non-interactive \
+        --no-eff-email 2>&1 | tee /tmp/certbot.log; then
+        echo "✓ Certificate obtained successfully for both domains"
+    else
+        echo "✗ Failed to obtain certificate. Check the log above."
+        echo ""
+        echo "Common issues:"
+        echo "  1. DNS: Both $PRIMARY_DOMAIN and $WWW_DOMAIN must point to this server"
+        echo "     Check: nslookup $PRIMARY_DOMAIN && nslookup $WWW_DOMAIN"
+        echo ""
+        echo "  2. Port 80 not accessible from internet"
+        echo "     Fix: sudo ufw allow 80"
+        echo ""
+        echo "  3. Rate limit (wait 1 hour)"
+        exit 1
+    fi
 fi
 
-# Enable HTTPS config now that certificate exists
-echo "Generating HTTPS config..."
-envsubst '${DOMAIN}' < /etc/nginx/templates/app.https.conf.template > /etc/nginx/conf.d/app.https.conf
+# Enable HTTPS config
+echo "Step 4: Enabling HTTPS configuration..."
+export NGINX_SERVER_NAME="$ALL_DOMAINS"
+export PRIMARY_DOMAIN="$PRIMARY_DOMAIN"
+envsubst '${NGINX_SERVER_NAME} ${PRIMARY_DOMAIN}' < /etc/nginx/templates/app.https.conf.template > /etc/nginx/conf.d/default.conf
 
-# Validate new configuration before reloading
-echo "Validating Nginx config with HTTPS..."
-nginx -t || (echo "Nginx config test failed after generating HTTPS config" && exit 1)
+# Validate new config
+echo "Step 5: Validating HTTPS configuration..."
+nginx -t
 
-# Reload Nginx so HTTPS is enabled
-echo "Reloading Nginx with HTTPS..."
+# Reload Nginx to apply HTTPS config
+echo "Step 6: Reloading Nginx with HTTPS..."
 nginx -s reload
 
-# Keep container running
-wait $NGINX_PID
+echo "=== SSL Setup Complete! ==="
+echo "Your site is now accessible at:"
+echo "  https://$PRIMARY_DOMAIN"
+echo "  https://$WWW_DOMAIN"
+
+# Set up auto-renewal in background
+echo "Setting up certificate auto-renewal..."
+(
+    while :; do
+        sleep 12h
+        echo "Checking for certificate renewal..."
+        certbot renew --webroot -w /var/www/certbot --quiet --deploy-hook "nginx -s reload"
+    done
+) &
+
+# Keep nginx running in foreground
+nginx -g "daemon off;"
