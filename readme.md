@@ -39,6 +39,7 @@ Click on *manage* of the domain, and got to *DNS / Nameservers* in order to poin
 You will find many DNS records there, one of them is A Record, by default pointing to an ip address.
 - Delete default A record
 - Create New A record point to *IP Address* that your VPS has.
+- A CNAME record poin to *domain* (Normally, This should already have in your domain DNS Record, Just make sure it is available, otherwise create one). To Create CNAME rocord, name: www, priority: 0, target: your domain, TTL: 300, and Save. 
 
 ![description](assets/create_a_record.png)
 
