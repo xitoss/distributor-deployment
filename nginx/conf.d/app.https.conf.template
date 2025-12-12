@@ -39,18 +39,9 @@ server {
     # add_header Content-Security-Policy "default-src 'self'" always;
     # add_header X-Frame-Options "deny" always;
 
-    add_header Content-Security-Policy "
-        default-src 'self';
-        script-src 'self' https: 'unsafe-inline';
-        style-src 'self' 'unsafe-inline' https:;
-        img-src 'self' data: https:;
-        font-src 'self' data: https:;
-        connect-src 'self' https:;
-        object-src 'none';
-        frame-ancestors 'self';
-        frame-src *;
-        media-src *;
-    " always;
+    # multiline does not support in http2, so made it one liner.
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' https: 'unsafe-inline'; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; font-src 'self' data: https:; connect-src 'self' https:; object-src 'none'; frame-ancestors 'self'; frame-src *; media-src *;" always;
+
 
     add_header X-Content-Type-Options "nosniff" always;
 
