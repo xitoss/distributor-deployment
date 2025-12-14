@@ -153,6 +153,46 @@ This will install
 - python3-
 - docker
 
+#### Important! If you installed any other OS instead of Ubuntu in your VPS, make sure update the code inside initialize.sh. Because different OS has different way of installing docker and docker compose. 
+```bash
+# -------------------------------
+# Install Docker + Docker Compose v2
+# -------------------------------
+echo "=== Docker + Docker Compose Setup ==="
+
+if command -v docker &>/dev/null; then
+    echo "Docker is already installed: $(docker --version)"
+else
+    echo "Installing Docker..."
+
+    # If old files still available, docker will fail to install...
+    # Remove old Docker versions if present
+    sudo apt remove -y docker docker-engine docker.io containerd runc || true
+
+    # Remove ALL old Docker repository configurations
+    sudo rm -f /etc/apt/sources.list.d/docker.list
+    sudo rm -f /etc/apt/sources.list.d/docker.sources
+    sudo rm -f /etc/apt/keyrings/docker.asc
+    sudo rm -f /etc/apt/keyrings/docker.gpg
+    sudo rm -f /etc/apt/trusted.gpg.d/docker.gpg
+    # Remove any Docker entries from main sources.list
+    sudo sed -i '/download.docker.com/d' /etc/apt/sources.list
+
+    # Add Docker's GPG key
+    sudo install -m 0755 -d /etc/apt/keyrings
+    sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+    sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+    # Add Docker repository (deb822 format)
+    sudo tee /etc/apt/sources.list.d/docker.sources > /dev/null <<EOF
+Types: deb
+URIs: https://download.docker.com/linux/ubuntu
+Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+Components: stable
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
+```
+
 ### 5. Run Preflight Setup
 The preflight script will create a `.env` file containing all necessary configuration. This file is critical for the application - please do not edit it manually unless you know what you're doing.
 
