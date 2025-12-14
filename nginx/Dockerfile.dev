@@ -5,7 +5,4 @@ RUN apk add --no-cache gettext
 
 RUN rm -f /etc/nginx/conf.d/default.conf
 
-
-# Copy your templates into /etc/nginx/templates/
-# Nginx official image auto-processes *.template with envsubst on startup
-COPY conf.d/app.dev.conf.template /etc/nginx/templates/
+COPY conf.d/app.dev.conf.template /etc/nginx/conf.d/default.conf

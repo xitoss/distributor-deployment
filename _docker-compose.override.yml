@@ -1,62 +1,53 @@
+name: xitoss-distributor
+
 services:
+  db:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - db_dev:/var/lib/postgresql/data
+      - ./backup:/workspace/backup
+    
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   web:
     build: ../distributor
     image: distributor-app:local
-    restart: unless-stopped
-    pull_policy: never
     env_file:
       - .env
     depends_on:
       db:
         condition: service_healthy
     volumes:
-      - ../distributor:/app
       - ./license:/app/license/
       - ./processing:/app/processing
-      - ./version:/app/version
-      - ./backup:/app/backup
       - ./media:/app/media
       - static_volume:/app/staticfiles
-
+      - ./version:/app/version
+      - ./backup:/app/backup
     ports:
       - 8000:8000
-
     healthcheck:
-      test: ["CMD-SHELL", "curl -fs http://localhost:8000/health/ || exit 1"]
-      interval: 10s
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health/ || exit 1"]
+      interval: 20s
       timeout: 5s
       retries: 5
+      start_period: 60s
 
     command: python manage.py runserver 0.0.0.0:8000
-  
-  # web:
-  #   image: ghcr.io/xitoss/distributor-app:latest  # from your GitHub package
-  #   restart: unless-stopped
-  #   env_file:
-  #     - .env
-  #   depends_on:
-  #     - db
-  #   volumes:
-  #     - ./license:/app/license/
-  #     - ./processing:/app/processing
-  #     - ./media:/app/media
-  #     - static_volume:/app/staticfiles
-  #     - ./version:/app/version     
-  #   expose:
-  #     - "8000"
-  # healthcheck:
-  #     test: ["CMD-SHELL", "curl -fs http://localhost/health/ || exit 1"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
-  #   command: python manage.py runserver 0.0.0.0:8000
-
   nginx:
     build:
       context: ./nginx
       dockerfile: Dockerfile.dev
-    ports:
-      - "8080:80"
+    restart: unless-stopped
     env_file: .env
     volumes:
       - ./media:/app/media
@@ -64,15 +55,23 @@ services:
       - ./processing:/deployment/processing
       - ./nginx/maintenance:/var/www/maintenance
       - ./nginx/safety_pages:/var/www/safety
-    
     depends_on:
       - web
+      
+  agent:
+    build:
+      context: .
+      dockerfile: ./sys_scripts/Dockerfile.agent
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${AGENT_PORT:-6001}:${AGENT_PORT:-6001}"
+    volumes:
+      - .:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+    working_dir: /workspace
   
-  certbot:
-    image: certbot/certbot
-    # this will overriede chertbot from actual one and do nothing
-    entrypoint: ["true"]
-
 volumes:
-  db_prod:
+  db_dev:
   static_volume:

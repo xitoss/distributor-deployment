@@ -1,6 +1,6 @@
 {
-    "version": "v1.0.6",
-    "desc": "Critical bug fix and updated operational modules",
+    "version": "v1.0.8",
+    "desc": "All previous version are considered depricated and should not be used. We have tested this version for final release.",
     "flag": "stable",
     "db-migrate": true,
     "date": "2025-12-14"
