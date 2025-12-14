@@ -6,7 +6,6 @@ RUN apk add --no-cache gettext certbot
 COPY conf.d/global.conf /etc/nginx/conf.d/global.conf
 
 # Copy templates, these templates include dynamic values, getting from start.sh
-COPY conf.d/app.http.conf.template /etc/nginx/templates/
 COPY conf.d/app.https.conf.template /etc/nginx/templates/
 
 # Entry script
