@@ -1,9 +1,16 @@
 name: xitoss-distributor
 
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   db:
     image: postgres:15
     restart: unless-stopped
+    logging: *default-logging
     environment:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USER}
@@ -21,6 +28,7 @@ services:
   web:
     image: ghcr.io/xitoss/distributor-app:latest  # from your GitHub package
     restart: unless-stopped
+    logging: *default-logging
     env_file:
       - .env
     depends_on:
@@ -44,6 +52,7 @@ services:
       context: ./nginx
       dockerfile: Dockerfile.prod
     restart: unless-stopped
+    logging: *default-logging
     ports:
       - "80:80"
       - "443:443"
@@ -64,6 +73,7 @@ services:
       context: .
       dockerfile: ./sys_scripts/Dockerfile.agent
     restart: unless-stopped
+    logging: *default-logging
     env_file:
       - .env
     ports:

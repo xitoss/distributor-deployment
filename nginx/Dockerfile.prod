@@ -8,6 +8,14 @@ COPY conf.d/global.conf /etc/nginx/conf.d/global.conf
 # Copy templates, these templates include dynamic values, getting from start.sh
 COPY conf.d/app.https.conf.template /etc/nginx/templates/
 
+# Redirect logs to Docker
+# create symbolic link for all nginx logs.
+# reason: in general nginx writes logs, and the file might keep growing as people start using the application.
+# my docker compose setup has limit set to 10mbx3 = 30 mb max size of logs.
+# now as nginx logs will be  written inside docker itself, the size rotation will affect how big the log file grows.
+RUN ln -sf /dev/stdout /var/log/nginx/access.log \
+    && ln -sf /dev/stderr /var/log/nginx/error.log
+
 # Entry script
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
