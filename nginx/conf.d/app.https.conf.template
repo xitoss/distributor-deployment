@@ -111,6 +111,7 @@ server {
         alias /app/staticfiles/;
         expires 30d;
         add_header Cache-Control "public, immutable";
+        limit_req zone=no_limit;
     }
 
     # App get media file refeference form this mounted directory
@@ -118,6 +119,7 @@ server {
         alias /app/media/;
         expires 20d;
         add_header Cache-Control "public";
+        limit_req zone=no_limit;
     }
     
     # When there is a .maintaining file, server is doing some maintenance jobs, example: update application
