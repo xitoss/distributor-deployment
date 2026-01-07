@@ -1,7 +1,7 @@
 {
-    "version": "v1.0.9",
-    "desc": "Qty can be decimal, doc number uniqueness, ui improvement",
+    "version": "v1.0.10",
+    "desc": "critial bug fix",
     "flag": "stable",
-    "db-migrate": true,
+    "db-migrate": false,
     "date": "2025-1-7"
 }
