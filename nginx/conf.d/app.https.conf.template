@@ -68,13 +68,6 @@ server {
     # Adding large size image might make the disk full very first, and client will suffer in future.
     client_max_body_size 20M;
 
-    # per-site request/concurrent-connection limits (zones are declared in global.conf).
-    # - `limit_req` mitigates request-rate floods and brute-force attempts.
-    # - `limit_conn` reduces concurrent-connection floods (helpful for WebSocket/connection storms).
-    limit_req zone=req_limit_per_ip burst=20 nodelay;
-    limit_req_status 429; 
-    limit_conn conn_limit_per_ip 20;
-
     # --- Server-level proxy headers (inherited by all location blocks) ---
     # These headers are forwarded to the backend application to preserve request context.
     # - `Host` preserves the original Host so Django can validate ALLOWED_HOSTS and generate correct absolute URLs.
@@ -101,7 +94,6 @@ server {
 
     # Health check endpoint: always allow, never rate-limited
     location = /health/ {
-        limit_req zone=no_limit;
         proxy_pass http://web;
         # Proxy headers inherited from server level
     }
@@ -111,7 +103,6 @@ server {
         alias /app/staticfiles/;
         expires 30d;
         add_header Cache-Control "public, immutable";
-        limit_req zone=no_limit;
     }
 
     # App get media file refeference form this mounted directory
@@ -119,7 +110,6 @@ server {
         alias /app/media/;
         expires 20d;
         add_header Cache-Control "public";
-        limit_req zone=no_limit;
     }
     
     # When there is a .maintaining file, server is doing some maintenance jobs, example: update application
@@ -168,6 +158,8 @@ server {
         # Return 429 when limit exceeded (error_page 429 already configured above)
         limit_req_status 429;
 
+        limit_conn conn_limit_per_ip 20;
+
         # Send the request to the application upstream.
         # - `proxy_pass http://web;` forwards the request to the backend service listening on port 8000.
         proxy_pass http://web;
@@ -177,6 +169,9 @@ server {
     # proxy application requests to the upstream `web` service (defined in global.conf).
     # Headers (Host, X-Real-IP, X-Forwarded-For, X-Forwarded-Proto) are inherited from server level.
     location / {
+        limit_req zone=req_limit_per_ip burst=20 nodelay;
+        limit_req_status 429; 
+        limit_conn conn_limit_per_ip 20;
         proxy_pass http://web;
     }
 }
