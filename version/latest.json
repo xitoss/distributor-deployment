@@ -1,7 +1,7 @@
 {
-    "version": "v1.0.11",
-    "desc": "ui improvements",
+    "version": "v1.0.12",
+    "desc": "minor ui bug fix",
     "flag": "stable",
-    "db-migrate": true,
+    "db-migrate": false,
     "date": "2026-3-15"
 }
