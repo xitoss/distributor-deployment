@@ -1,7 +1,7 @@
 {
-    "version": "v1.0.13",
-    "desc": "minor ui bug fix",
+    "version": "v1.0.14",
+    "desc": "minor ui and pdf bug fix",
     "flag": "stable",
     "db-migrate": false,
-    "date": "2026-3-16"
+    "date": "2026-3-22"
 }
